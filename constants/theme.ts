@@ -27,6 +27,8 @@ export const Colors = {
   },
 };
 
+export const SuccessColor = '#22c55e';
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */
