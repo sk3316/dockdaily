@@ -1,21 +1,21 @@
-import { useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { useChatStore } from "@/store/useChatStore";
 import { useHabitStore } from "@/store/useHabitStore";
 import { useTaskStore } from "@/store/useTaskStore";
-import { useAppTheme } from "@/hooks/use-app-theme";
+import { Ionicons } from "@expo/vector-icons";
+import { useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SUGGESTED_QUESTIONS = [
   "What should I tackle first today?",
@@ -35,6 +35,7 @@ export default function AskHabitsSheet({ visible, onClose }: Props) {
   const { tasks } = useTaskStore();
   const [input, setInput] = useState("");
   const scrollRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const borderColor = scheme === "dark" ? "#2a2c2e" : "#eee";
   const cardBg = scheme === "dark" ? "#1f2123" : "#f8f8f8";
@@ -62,8 +63,7 @@ export default function AskHabitsSheet({ visible, onClose }: Props) {
     >
       <KeyboardAvoidingView
         style={[styles.sheet, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        behavior="padding"
       >
         <View style={[styles.handle, { backgroundColor: borderColor }]} />
 
@@ -71,7 +71,7 @@ export default function AskHabitsSheet({ visible, onClose }: Props) {
           <View style={styles.headerLeft}>
             <Ionicons name="sparkles" size={20} color={colors.tint} />
             <Text style={[styles.headerTitle, { color: colors.text }]}>
-              Ask about your habits v2
+              Ask about your habits
             </Text>
           </View>
           <TouchableOpacity onPress={handleClose}>
@@ -164,7 +164,15 @@ export default function AskHabitsSheet({ visible, onClose }: Props) {
           )}
         </ScrollView>
 
-        <View style={[styles.inputRow, { borderTopColor: borderColor }]}>
+        <View
+          style={[
+            styles.inputRow,
+            {
+              borderTopColor: borderColor,
+              paddingBottom: Math.max(12, insets.bottom + 8),
+            },
+          ]}
+        >
           <TextInput
             style={[
               styles.input,

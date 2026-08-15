@@ -1,40 +1,56 @@
-import { useEffect, useMemo, useState } from 'react';
+import AISuggestionSheet from "@/components/AISuggestionSheet";
+import { useAnimatedProgress } from "@/hooks/use-animated-progress";
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { useCelebration } from "@/hooks/use-celebration";
+import { useAIStore } from "@/store/useAIStore";
+import { useHabitStore } from "@/store/useHabitStore";
+import { useTaskStore } from "@/store/useTaskStore";
+import { Habit } from "@/types";
+import { requestNotificationPermissions } from "@/utils/notifications";
+import { calculateStreak } from "@/utils/streak";
+import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useMemo, useState } from "react";
 import {
-  View,
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
-  Alert,
-  RefreshControl,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useHabitStore } from '@/store/useHabitStore';
-import { useAIStore } from '@/store/useAIStore';
-import AISuggestionSheet from '@/components/AISuggestionSheet';
-import { useTaskStore } from '@/store/useTaskStore';
-import { Habit } from '@/types';
-import { calculateStreak } from '@/utils/streak';
-import { useCelebration } from '@/hooks/use-celebration';
-import { useAnimatedProgress } from '@/hooks/use-animated-progress';
-import { useAppTheme } from '@/hooks/use-app-theme';
-import { requestNotificationPermissions } from '@/utils/notifications';
-import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
+  View,
+} from "react-native";
+import DraggableFlatList, {
+  RenderItemParams,
+  ScaleDecorator,
+} from "react-native-draggable-flatlist";
 
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
 
-const HABIT_TYPES: { key: Habit['type']; label: string }[] = [
-  { key: 'boolean', label: 'Yes/No' },
-  { key: 'count', label: 'Count' },
-  { key: 'duration', label: 'Minutes' },
+const HABIT_TYPES: { key: Habit["type"]; label: string }[] = [
+  { key: "boolean", label: "Yes/No" },
+  { key: "count", label: "Count" },
+  { key: "duration", label: "Minutes" },
 ];
 
 export default function HabitsScreen() {
-  const { habits, logsToday, allLogs, loadHabits, loadTodayLogs, loadAllLogs,
-    addHabit, logHabit, deleteHabit, reorderHabits, updateHabitTitle, setHabitReminder } = useHabitStore();
+  const {
+    habits,
+    logsToday,
+    allLogs,
+    loadHabits,
+    loadTodayLogs,
+    loadAllLogs,
+    addHabit,
+    logHabit,
+    deleteHabit,
+    reorderHabits,
+    updateHabitTitle,
+    setHabitReminder,
+  } = useHabitStore();
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -44,13 +60,13 @@ export default function HabitsScreen() {
     setRefreshing(false);
   };
 
-  const [input, setInput] = useState('');
-  const [selectedType, setSelectedType] = useState<Habit['type']>('boolean');
-  const [targetInput, setTargetInput] = useState('1');
+  const [input, setInput] = useState("");
+  const [selectedType, setSelectedType] = useState<Habit["type"]>("boolean");
+  const [targetInput, setTargetInput] = useState("1");
   const [editingCounterId, setEditingCounterId] = useState<string | null>(null);
-  const [editingCounterText, setEditingCounterText] = useState('');
+  const [editingCounterText, setEditingCounterText] = useState("");
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
-  const [editingTitleText, setEditingTitleText] = useState('');
+  const [editingTitleText, setEditingTitleText] = useState("");
   const [reminderPickerId, setReminderPickerId] = useState<string | null>(null);
   const [pickerHour, setPickerHour] = useState(9);
   const [pickerMinute, setPickerMinute] = useState(0);
@@ -67,44 +83,49 @@ export default function HabitsScreen() {
 
   const logsByHabit = useMemo(() => {
     const map: Record<string, { value: number; completed: boolean }> = {};
-    for (const log of logsToday) map[log.habit_id] = { value: log.value, completed: log.completed };
+    for (const log of logsToday)
+      map[log.habit_id] = { value: log.value, completed: log.completed };
     return map;
   }, [logsToday]);
 
-  const completedCount = useMemo(() => habits.filter((h) => logsByHabit[h.id]?.completed).length, [habits, logsByHabit]);
+  const completedCount = useMemo(
+    () => habits.filter((h) => logsByHabit[h.id]?.completed).length,
+    [habits, logsByHabit],
+  );
   const totalCount = habits.length;
   const progress = totalCount > 0 ? completedCount / totalCount : 0;
-  const { width: progressBarWidth, backgroundColor: progressBarColor } = useAnimatedProgress(
-    progress,
-    colors.tint
-  );
+  const { width: progressBarWidth, backgroundColor: progressBarColor } =
+    useAnimatedProgress(progress, colors.tint);
 
   const handleAdd = async () => {
     if (!input.trim()) return;
-    const target = selectedType === 'boolean' ? 1 : Math.max(1, parseInt(targetInput, 10) || 1);
+    const target =
+      selectedType === "boolean"
+        ? 1
+        : Math.max(1, parseInt(targetInput, 10) || 1);
     await addHabit(input.trim(), selectedType, target);
 
     const updatedHabits = useHabitStore.getState().habits;
     const newHabit = updatedHabits.find((h) => h.title === input.trim());
 
-    setInput('');
-    setTargetInput('1');
-    setSelectedType('boolean');
+    setInput("");
+    setTargetInput("1");
+    setSelectedType("boolean");
 
     if (newHabit) {
       Alert.alert(
-        '✨ Want suggestions?',
+        "✨ Want suggestions?",
         `Get AI-powered habits and tasks to help you succeed with "${newHabit.title}"?`,
         [
-          { text: 'No thanks', style: 'cancel' },
+          { text: "No thanks", style: "cancel" },
           {
-            text: 'Yes, suggest!',
+            text: "Yes, suggest!",
             onPress: () => {
               const openTasks = tasks.filter((t) => !t.completed);
               fetchSuggestions(newHabit, updatedHabits, openTasks);
             },
           },
-        ]
+        ],
       );
     }
   };
@@ -118,7 +139,7 @@ export default function HabitsScreen() {
     logHabit(habit.id, next, habit.target);
     if (editingCounterId === habit.id) {
       setEditingCounterId(null);
-      setEditingCounterText('');
+      setEditingCounterText("");
     }
   };
 
@@ -147,7 +168,7 @@ export default function HabitsScreen() {
     }
     logHabit(habit.id, value, habit.target);
     setEditingCounterId(null);
-    setEditingCounterText('');
+    setEditingCounterText("");
   };
 
   const startEditingTitle = (habit: Habit) => {
@@ -158,12 +179,12 @@ export default function HabitsScreen() {
   const saveTitleEdit = async (habit: Habit) => {
     await updateHabitTitle(habit.id, editingTitleText);
     setEditingTitleId(null);
-    setEditingTitleText('');
+    setEditingTitleText("");
   };
 
   const cancelTitleEdit = () => {
     setEditingTitleId(null);
-    setEditingTitleText('');
+    setEditingTitleText("");
   };
 
   const toggleReminderPicker = (habit: Habit) => {
@@ -172,7 +193,7 @@ export default function HabitsScreen() {
       return;
     }
     if (habit.reminder_time) {
-      const [h, m] = habit.reminder_time.split(':').map(Number);
+      const [h, m] = habit.reminder_time.split(":").map(Number);
       setPickerHour(h);
       setPickerMinute(m);
     } else {
@@ -185,10 +206,13 @@ export default function HabitsScreen() {
   const commitReminder = async (habit: Habit) => {
     const granted = await requestNotificationPermissions();
     if (!granted) {
-      Alert.alert('Permission needed', 'Enable notifications in Settings to use reminders.');
+      Alert.alert(
+        "Permission needed",
+        "Enable notifications in Settings to use reminders.",
+      );
       return;
     }
-    const formatted = `${String(pickerHour).padStart(2, '0')}:${String(pickerMinute).padStart(2, '0')}`;
+    const formatted = `${String(pickerHour).padStart(2, "0")}:${String(pickerMinute).padStart(2, "0")}`;
     await setHabitReminder(habit.id, formatted);
     setReminderPickerId(null);
   };
@@ -211,14 +235,19 @@ export default function HabitsScreen() {
     const flashColor = flashAnim.interpolate({
       inputRange: [0, 1],
       outputRange: [
-        'rgba(34,197,94,0)',
-        scheme === 'dark' ? 'rgba(34,197,94,0.28)' : 'rgba(34,197,94,0.16)',
+        "rgba(34,197,94,0)",
+        scheme === "dark" ? "rgba(34,197,94,0.28)" : "rgba(34,197,94,0.16)",
       ],
     });
 
     return (
       <ScaleDecorator>
-        <View style={[styles.habitWrapper, { borderBottomColor: scheme === 'dark' ? '#2a2c2e' : '#eee' }]}>
+        <View
+          style={[
+            styles.habitWrapper,
+            { borderBottomColor: scheme === "dark" ? "#2a2c2e" : "#eee" },
+          ]}
+        >
           <AnimatedTouchableOpacity
             onLongPress={drag}
             disabled={isActive}
@@ -227,7 +256,7 @@ export default function HabitsScreen() {
               styles.habitRow,
               { backgroundColor: flashColor },
               isActive && {
-                backgroundColor: scheme === 'dark' ? '#1f2123' : '#f9f9f9',
+                backgroundColor: scheme === "dark" ? "#1f2123" : "#f9f9f9",
                 opacity: 0.7,
               },
             ]}
@@ -260,31 +289,55 @@ export default function HabitsScreen() {
               {!isEditingTitle && (
                 <View style={styles.streakRow}>
                   <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                    <Ionicons name="flame" size={14} color={streak > 0 ? '#f97316' : colors.icon} />
+                    <Ionicons
+                      name="flame"
+                      size={14}
+                      color={streak > 0 ? "#f97316" : colors.icon}
+                    />
                   </Animated.View>
-                  <Text style={[styles.streakText, { color: streak > 0 ? '#f97316' : colors.icon }]}>
-                    {streak} day{streak === 1 ? '' : 's'}
+                  <Text
+                    style={[
+                      styles.streakText,
+                      { color: streak > 0 ? "#f97316" : colors.icon },
+                    ]}
+                  >
+                    {streak} day{streak === 1 ? "" : "s"}
                   </Text>
                 </View>
               )}
             </View>
 
-            {item.type === 'boolean' ? (
-              <TouchableOpacity onPress={() => handleToggleBoolean(item)} style={styles.checkbox}>
-                <Ionicons name={completed ? 'checkbox' : 'square-outline'} size={28} color={completed ? '#22c55e' : colors.icon} />
+            {item.type === "boolean" ? (
+              <TouchableOpacity
+                onPress={() => handleToggleBoolean(item)}
+                style={styles.checkbox}
+              >
+                <Ionicons
+                  name={completed ? "checkbox" : "square-outline"}
+                  size={28}
+                  color={completed ? "#22c55e" : colors.icon}
+                />
               </TouchableOpacity>
             ) : (
               <View style={styles.counterRow}>
-                <TouchableOpacity onPress={() => handleIncrement(item, -1)} style={styles.counterButton}>
+                <TouchableOpacity
+                  onPress={() => handleIncrement(item, -1)}
+                  style={styles.counterButton}
+                >
                   <Ionicons name="remove" size={18} color={colors.text} />
                 </TouchableOpacity>
 
                 {isEditingCounter ? (
                   <View style={styles.counterEditRow}>
                     <TextInput
-                      style={[styles.counterInput, { color: colors.text, borderColor: colors.tint }]}
+                      style={[
+                        styles.counterInput,
+                        { color: colors.text, borderColor: colors.tint },
+                      ]}
                       value={editingCounterText}
-                      onChangeText={(text) => setEditingCounterText(text.replace(/[^0-9]/g, ''))}
+                      onChangeText={(text) =>
+                        setEditingCounterText(text.replace(/[^0-9]/g, ""))
+                      }
                       onSubmitEditing={() => saveCounterEdit(item)}
                       onBlur={() => saveCounterEdit(item)}
                       keyboardType="number-pad"
@@ -292,36 +345,62 @@ export default function HabitsScreen() {
                       selectTextOnFocus
                       maxLength={5}
                     />
-                    <Text style={[styles.counterSuffix, { color: colors.text }]}>
-                      /{item.target}{item.type === 'duration' ? 'm' : ''}
+                    <Text
+                      style={[styles.counterSuffix, { color: colors.text }]}
+                    >
+                      /{item.target}
+                      {item.type === "duration" ? "m" : ""}
                     </Text>
                   </View>
                 ) : (
                   <TouchableOpacity onPress={() => startEditingCounter(item)}>
-                    <Text style={[styles.counterText, { color: completed ? '#22c55e' : colors.text }]}>
-                      {value}/{item.target}{item.type === 'duration' ? 'm' : ''}
+                    <Text
+                      style={[
+                        styles.counterText,
+                        { color: completed ? "#22c55e" : colors.text },
+                      ]}
+                    >
+                      {value}/{item.target}
+                      {item.type === "duration" ? "m" : ""}
                     </Text>
                   </TouchableOpacity>
                 )}
 
-                <TouchableOpacity onPress={() => handleIncrement(item, 1)} style={styles.counterButton}>
+                <TouchableOpacity
+                  onPress={() => handleIncrement(item, 1)}
+                  style={styles.counterButton}
+                >
                   <Ionicons name="add" size={18} color={colors.text} />
                 </TouchableOpacity>
               </View>
             )}
 
             <View style={styles.rightActions}>
-              <TouchableOpacity onPress={() => toggleReminderPicker(item)} style={{ padding: 4 }}>
+              <TouchableOpacity
+                onPress={() => toggleReminderPicker(item)}
+                style={{ padding: 4 }}
+              >
                 <Ionicons
-                  name={item.reminder_time ? 'notifications' : 'notifications-outline'}
+                  name={
+                    item.reminder_time
+                      ? "notifications"
+                      : "notifications-outline"
+                  }
                   size={18}
                   color={item.reminder_time ? colors.tint : colors.icon}
                 />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => deleteHabit(item.id)} style={{ padding: 4 }}>
+              <TouchableOpacity
+                onPress={() => deleteHabit(item.id)}
+                style={{ padding: 4 }}
+              >
                 <Ionicons name="trash-outline" size={18} color="#ef4444" />
               </TouchableOpacity>
-              <TouchableOpacity onLongPress={drag} delayLongPress={0} style={{ padding: 4 }}>
+              <TouchableOpacity
+                onLongPress={drag}
+                delayLongPress={0}
+                style={{ padding: 4 }}
+              >
                 <Ionicons name="menu-outline" size={20} color={colors.icon} />
               </TouchableOpacity>
             </View>
@@ -331,33 +410,69 @@ export default function HabitsScreen() {
             <View
               style={[
                 styles.reminderPicker,
-                { borderTopColor: scheme === 'dark' ? '#2a2c2e' : '#eee', backgroundColor: scheme === 'dark' ? '#1a1c1e' : '#fafafa' },
+                {
+                  borderTopColor: scheme === "dark" ? "#2a2c2e" : "#eee",
+                  backgroundColor: scheme === "dark" ? "#1a1c1e" : "#fafafa",
+                },
               ]}
             >
               <View style={styles.timePickerCol}>
-                <TouchableOpacity onPress={() => setPickerHour((h) => (h + 1) % 24)} style={styles.timeArrow}>
+                <TouchableOpacity
+                  onPress={() => setPickerHour((h) => (h + 1) % 24)}
+                  style={styles.timeArrow}
+                >
                   <Ionicons name="chevron-up" size={18} color={colors.tint} />
                 </TouchableOpacity>
-                <Text style={[styles.timeValue, { color: colors.text }]}>{String(pickerHour).padStart(2, '0')}</Text>
-                <TouchableOpacity onPress={() => setPickerHour((h) => (h - 1 + 24) % 24)} style={styles.timeArrow}>
+                <Text style={[styles.timeValue, { color: colors.text }]}>
+                  {String(pickerHour).padStart(2, "0")}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setPickerHour((h) => (h - 1 + 24) % 24)}
+                  style={styles.timeArrow}
+                >
                   <Ionicons name="chevron-down" size={18} color={colors.tint} />
                 </TouchableOpacity>
               </View>
               <Text style={[styles.timeSep, { color: colors.text }]}>:</Text>
               <View style={styles.timePickerCol}>
-                <TouchableOpacity onPress={() => setPickerMinute((m) => (m + 5) % 60)} style={styles.timeArrow}>
+                <TouchableOpacity
+                  onPress={() => setPickerMinute((m) => (m + 5) % 60)}
+                  style={styles.timeArrow}
+                >
                   <Ionicons name="chevron-up" size={18} color={colors.tint} />
                 </TouchableOpacity>
-                <Text style={[styles.timeValue, { color: colors.text }]}>{String(pickerMinute).padStart(2, '0')}</Text>
-                <TouchableOpacity onPress={() => setPickerMinute((m) => (m - 5 + 60) % 60)} style={styles.timeArrow}>
+                <Text style={[styles.timeValue, { color: colors.text }]}>
+                  {String(pickerMinute).padStart(2, "0")}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setPickerMinute((m) => (m - 5 + 60) % 60)}
+                  style={styles.timeArrow}
+                >
                   <Ionicons name="chevron-down" size={18} color={colors.tint} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => commitReminder(item)} style={[styles.reminderSetButton, { backgroundColor: colors.tint }]}>
-                <Text style={{ color: scheme === 'dark' ? '#151718' : '#fff', fontWeight: '700', fontSize: 13 }}>Set</Text>
+              <TouchableOpacity
+                onPress={() => commitReminder(item)}
+                style={[
+                  styles.reminderSetButton,
+                  { backgroundColor: colors.tint },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: scheme === "dark" ? "#151718" : "#fff",
+                    fontWeight: "700",
+                    fontSize: 13,
+                  }}
+                >
+                  Set
+                </Text>
               </TouchableOpacity>
               {item.reminder_time && (
-                <TouchableOpacity onPress={() => removeReminder(item)} style={styles.reminderRemoveButton}>
+                <TouchableOpacity
+                  onPress={() => removeReminder(item)}
+                  style={styles.reminderRemoveButton}
+                >
                   <Ionicons name="close-circle" size={22} color="#ef4444" />
                 </TouchableOpacity>
               )}
@@ -371,8 +486,8 @@ export default function HabitsScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.flexFill, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <View style={styles.container}>
         <Text style={[styles.header, { color: colors.text }]}>Habits</Text>
@@ -383,11 +498,17 @@ export default function HabitsScreen() {
               <View
                 style={[
                   styles.progressTrackBg,
-                  { backgroundColor: scheme === 'dark' ? '#2a2c2e' : '#eee' },
+                  { backgroundColor: scheme === "dark" ? "#2a2c2e" : "#eee" },
                 ]}
               >
                 <Animated.View
-                  style={[styles.progressFill, { width: progressBarWidth, backgroundColor: progressBarColor }]}
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: progressBarWidth,
+                      backgroundColor: progressBarColor,
+                    },
+                  ]}
                 />
               </View>
             </View>
@@ -411,17 +532,57 @@ export default function HabitsScreen() {
               onRefresh={handleRefresh}
               tintColor={colors.tint}
               colors={[colors.tint]}
+              progressBackgroundColor={
+                scheme === "dark" ? "#1f2123" : "#ffffff"
+              }
             />
           }
-          ListEmptyComponent={<Text style={[styles.emptyText, { color: colors.icon }]}>No habits yet — add one below 👇</Text>}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: colors.icon }]}>
+              No habits yet — add one below 👇
+            </Text>
+          }
         />
       </View>
 
-      <View style={[styles.addSection, { borderTopColor: scheme === 'dark' ? '#2a2c2e' : '#eee', backgroundColor: colors.background }]}>
+      <View
+        style={[
+          styles.addSection,
+          {
+            borderTopColor: scheme === "dark" ? "#2a2c2e" : "#eee",
+            backgroundColor: colors.background,
+          },
+        ]}
+      >
         <View style={styles.typeRow}>
           {HABIT_TYPES.map((t) => (
-            <TouchableOpacity key={t.key} onPress={() => setSelectedType(t.key)} style={[styles.typeChip, { backgroundColor: selectedType === t.key ? colors.tint : (scheme === 'dark' ? '#1f2123' : '#f2f2f2') }]}>
-              <Text style={{ color: selectedType === t.key ? (scheme === 'dark' ? '#151718' : '#fff') : colors.text, fontSize: 13, fontWeight: '600' }}>
+            <TouchableOpacity
+              key={t.key}
+              onPress={() => setSelectedType(t.key)}
+              style={[
+                styles.typeChip,
+                {
+                  backgroundColor:
+                    selectedType === t.key
+                      ? colors.tint
+                      : scheme === "dark"
+                        ? "#1f2123"
+                        : "#f2f2f2",
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color:
+                    selectedType === t.key
+                      ? scheme === "dark"
+                        ? "#151718"
+                        : "#fff"
+                      : colors.text,
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+              >
                 {t.label}
               </Text>
             </TouchableOpacity>
@@ -430,7 +591,13 @@ export default function HabitsScreen() {
 
         <View style={styles.inputRow}>
           <TextInput
-            style={[styles.input, { backgroundColor: scheme === 'dark' ? '#1f2123' : '#f2f2f2', color: colors.text }]}
+            style={[
+              styles.input,
+              {
+                backgroundColor: scheme === "dark" ? "#1f2123" : "#f2f2f2",
+                color: colors.text,
+              },
+            ]}
             placeholder="Add a habit..."
             placeholderTextColor={colors.icon}
             value={input}
@@ -439,9 +606,15 @@ export default function HabitsScreen() {
             returnKeyType="done"
           />
 
-          {selectedType !== 'boolean' && (
+          {selectedType !== "boolean" && (
             <TextInput
-              style={[styles.targetInput, { backgroundColor: scheme === 'dark' ? '#1f2123' : '#f2f2f2', color: colors.text }]}
+              style={[
+                styles.targetInput,
+                {
+                  backgroundColor: scheme === "dark" ? "#1f2123" : "#f2f2f2",
+                  color: colors.text,
+                },
+              ]}
               placeholder="Target"
               placeholderTextColor={colors.icon}
               value={targetInput}
@@ -450,8 +623,15 @@ export default function HabitsScreen() {
             />
           )}
 
-          <TouchableOpacity onPress={handleAdd} style={[styles.addButton, { backgroundColor: colors.tint }]}>
-            <Ionicons name="add" size={24} color={scheme === 'dark' ? '#151718' : '#fff'} />
+          <TouchableOpacity
+            onPress={handleAdd}
+            style={[styles.addButton, { backgroundColor: colors.tint }]}
+          >
+            <Ionicons
+              name="add"
+              size={24}
+              color={scheme === "dark" ? "#151718" : "#fff"}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -463,53 +643,118 @@ export default function HabitsScreen() {
 const styles = StyleSheet.create({
   flexFill: { flex: 1 },
   container: { flex: 1, paddingTop: 60, paddingHorizontal: 16 },
-  header: { fontSize: 28, fontWeight: '700', marginBottom: 16 },
+  header: { fontSize: 28, fontWeight: "700", marginBottom: 16 },
   progressSection: { marginBottom: 12 },
   progressTrack: { marginBottom: 6 },
-  progressTrackBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
-  progressLabel: { fontSize: 13, fontWeight: '500' },
+  progressTrackBg: { height: 6, borderRadius: 3, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 3 },
+  progressLabel: { fontSize: 13, fontWeight: "500" },
   habitWrapper: { borderBottomWidth: 1 },
-  habitRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
+  habitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    gap: 12,
+  },
   habitInfo: { flex: 1 },
-  habitTitle: { fontSize: 16, fontWeight: '500' },
+  habitTitle: { fontSize: 16, fontWeight: "500" },
   habitTitleInput: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
     borderBottomWidth: 1,
     paddingVertical: 2,
     paddingHorizontal: 0,
   },
-  streakRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  streakText: { fontSize: 13, fontWeight: '500' },
+  streakRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  streakText: { fontSize: 13, fontWeight: "500" },
   checkbox: { padding: 2 },
-  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  counterButton: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(128,128,128,0.15)' },
-  counterText: { fontSize: 14, fontWeight: '600', minWidth: 50, textAlign: 'center' },
-  counterEditRow: { flexDirection: 'row', alignItems: 'center', gap: 2, minWidth: 50, justifyContent: 'center' },
-  counterInput: { fontSize: 14, fontWeight: '600', borderBottomWidth: 1, minWidth: 28, textAlign: 'center', paddingVertical: 0, paddingHorizontal: 2 },
-  counterSuffix: { fontSize: 14, fontWeight: '600' },
-  emptyText: { textAlign: 'center', marginTop: 40, fontSize: 15 },
-  addSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 12 : 20, borderTopWidth: 1, gap: 8 },
-  typeRow: { flexDirection: 'row', gap: 8 },
+  counterRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  counterButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(128,128,128,0.15)",
+  },
+  counterText: {
+    fontSize: 14,
+    fontWeight: "600",
+    minWidth: 50,
+    textAlign: "center",
+  },
+  counterEditRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    minWidth: 50,
+    justifyContent: "center",
+  },
+  counterInput: {
+    fontSize: 14,
+    fontWeight: "600",
+    borderBottomWidth: 1,
+    minWidth: 28,
+    textAlign: "center",
+    paddingVertical: 0,
+    paddingHorizontal: 2,
+  },
+  counterSuffix: { fontSize: 14, fontWeight: "600" },
+  emptyText: { textAlign: "center", marginTop: 40, fontSize: 15 },
+  addSection: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 12 : 20,
+    borderTopWidth: 1,
+    gap: 8,
+  },
+  typeRow: { flexDirection: "row", gap: 8 },
   typeChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: { flex: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16 },
-  targetInput: { width: 70, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, fontSize: 16 },
-  addButton: { borderRadius: 12, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  rightActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  inputRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  input: {
+    flex: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  targetInput: {
+    width: 70,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  addButton: {
+    borderRadius: 12,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rightActions: { flexDirection: "row", alignItems: "center", gap: 4 },
   reminderPicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 12,
     borderTopWidth: 1,
   },
-  timePickerCol: { alignItems: 'center', gap: 2 },
+  timePickerCol: { alignItems: "center", gap: 2 },
   timeArrow: { padding: 2 },
-  timeValue: { fontSize: 18, fontWeight: '700', minWidth: 30, textAlign: 'center' },
-  timeSep: { fontSize: 18, fontWeight: '700' },
+  timeValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    minWidth: 30,
+    textAlign: "center",
+  },
+  timeSep: { fontSize: 18, fontWeight: "700" },
   reminderSetButton: {
     paddingHorizontal: 14,
     paddingVertical: 8,

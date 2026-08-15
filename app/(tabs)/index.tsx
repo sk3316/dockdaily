@@ -1,41 +1,47 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useAnimatedProgress } from "@/hooks/use-animated-progress";
+import { useCelebration } from "@/hooks/use-celebration";
+import { useHabitStore } from "@/store/useHabitStore";
+import { useTaskStore } from "@/store/useTaskStore";
+import { Habit, Task } from "@/types";
+import { calculateStreak } from "@/utils/streak";
+import { Ionicons } from "@expo/vector-icons";
+import { format, isToday } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  LayoutAnimation,
   Animated,
   Image,
+  LayoutAnimation,
   RefreshControl,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { format, isToday } from 'date-fns';
-import { useTaskStore } from '@/store/useTaskStore';
-import { useHabitStore } from '@/store/useHabitStore';
-import { calculateStreak } from '@/utils/streak';
-import { Habit, Task } from '@/types';
-import { useCelebration } from '@/hooks/use-celebration';
-import { useAnimatedProgress } from '@/hooks/use-animated-progress';
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import { router } from 'expo-router';
-import { useAuthStore } from '@/store/useAuthStore';
-import { useAppTheme } from '@/hooks/use-app-theme';
-import HabitRescueCard from '@/components/HabitRescueCard';
-
+import HabitRescueCard from "@/components/HabitRescueCard";
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { useAuthStore } from "@/store/useAuthStore";
+import { router } from "expo-router";
 
 function getGreeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 export default function TodayScreen() {
   const { tasks, loadTasks, toggleTask } = useTaskStore();
-  const { habits, logsToday, allLogs, loadHabits, loadTodayLogs, loadAllLogs, logHabit } =
-    useHabitStore();
+  const {
+    habits,
+    logsToday,
+    allLogs,
+    loadHabits,
+    loadTodayLogs,
+    loadAllLogs,
+    logHabit,
+  } = useHabitStore();
   // const scheme = useColorScheme();
   // const colors = Colors[scheme ?? 'light'];
   const { scheme, colors } = useAppTheme();
@@ -48,7 +54,12 @@ export default function TodayScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadTasks(), loadHabits(), loadTodayLogs(), loadAllLogs()]);
+    await Promise.all([
+      loadTasks(),
+      loadHabits(),
+      loadTodayLogs(),
+      loadAllLogs(),
+    ]);
     setRefreshing(false);
   };
 
@@ -61,14 +72,19 @@ export default function TodayScreen() {
 
   const logsByHabit = useMemo(() => {
     const map: Record<string, { value: number; completed: boolean }> = {};
-    for (const log of logsToday) map[log.habit_id] = { value: log.value, completed: log.completed };
+    for (const log of logsToday)
+      map[log.habit_id] = { value: log.value, completed: log.completed };
     return map;
   }, [logsToday]);
 
   const openTasks = useMemo(() => tasks.filter((t) => !t.completed), [tasks]);
   const completedTodayTasks = useMemo(
-    () => tasks.filter((t) => t.completed && t.completed_at && isToday(new Date(t.completed_at))),
-    [tasks]
+    () =>
+      tasks.filter(
+        (t) =>
+          t.completed && t.completed_at && isToday(new Date(t.completed_at)),
+      ),
+    [tasks],
   );
 
   const taskTotal = openTasks.length + completedTodayTasks.length;
@@ -82,10 +98,8 @@ export default function TodayScreen() {
   const combinedProgress = combinedTotal > 0 ? combinedDone / combinedTotal : 0;
 
   // Animated progress bar with green color transition
-  const { width: progressBarWidth, backgroundColor: progressBarColor } = useAnimatedProgress(
-    combinedProgress,
-    colors.tint
-  );
+  const { width: progressBarWidth, backgroundColor: progressBarColor } =
+    useAnimatedProgress(combinedProgress, colors.tint);
 
   const handleToggleBooleanHabit = (habit: Habit) => {
     const current = logsByHabit[habit.id]?.completed ?? false;
@@ -122,45 +136,63 @@ export default function TodayScreen() {
   };
 
   const { user, profile } = useAuthStore();
-  const displayName = profile?.display_name ?? user?.user_metadata?.full_name ?? '';
+  const displayName =
+    profile?.display_name ?? user?.user_metadata?.full_name ?? "";
   const initials = displayName
-    ? displayName.split(' ').filter((n: string) => n.length > 0).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
-    : '?';
+    ? displayName
+        .split(" ")
+        .filter((n: string) => n.length > 0)
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?";
 
-
-  const borderColor = scheme === 'dark' ? '#2a2c2e' : '#eee';
+  const borderColor = scheme === "dark" ? "#2a2c2e" : "#eee";
 
   return (
     <View style={[styles.flexFill, { backgroundColor: colors.background }]}>
       <View style={[styles.staticHeader, { borderBottomColor: borderColor }]}>
-       <View style={styles.greetingRow}>
-    <View style={styles.greetingText}>
-      <Text style={[styles.greeting, { color: colors.text }]}>{getGreeting()}</Text>
-      <Text style={[styles.date, { color: colors.icon }]}>
-        {format(new Date(), 'EEEE, MMMM d')}
-      </Text>
-    </View>
-    <TouchableOpacity
-      onPress={() => router.push('/profile')}
-      style={[
-        styles.avatarButton,
-        !profile?.avatar_url && { backgroundColor: colors.tint },
-      ]}
-    >
-      {profile?.avatar_url ? (
-        <Image
-          source={{ uri: profile.avatar_url }}
-          style={styles.avatarImage}
-        />
-      ) : (
-        <Text style={[styles.avatarText, { color: scheme === 'dark' ? '#151718' : '#fff' }]}>
-          {initials}
-        </Text>
-      )}
-    </TouchableOpacity>
-  </View>
+        <View style={styles.greetingRow}>
+          <View style={styles.greetingText}>
+            <Text style={[styles.greeting, { color: colors.text }]}>
+              {getGreeting()}
+            </Text>
+            <Text style={[styles.date, { color: colors.icon }]}>
+              {format(new Date(), "EEEE, MMMM d")}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push("/profile")}
+            style={[
+              styles.avatarButton,
+              !profile?.avatar_url && { backgroundColor: colors.tint },
+            ]}
+          >
+            {profile?.avatar_url ? (
+              <Image
+                source={{ uri: profile.avatar_url }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text
+                style={[
+                  styles.avatarText,
+                  { color: scheme === "dark" ? "#151718" : "#fff" },
+                ]}
+              >
+                {initials}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
 
-        <View style={[styles.summaryCard, { backgroundColor: scheme === 'dark' ? '#1f2123' : '#f2f2f2' }]}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: scheme === "dark" ? "#1f2123" : "#f2f2f2" },
+          ]}
+        >
           {combinedTotal === 0 ? (
             <Text style={[styles.summaryTitle, { color: colors.text }]}>
               Add a task or habit to start tracking today
@@ -168,16 +200,31 @@ export default function TodayScreen() {
           ) : (
             <>
               <View style={styles.summaryTextRow}>
-                <Text style={[styles.summaryTitle, { color: colors.text }]}>{"Today's progress"}</Text>
-                <Text style={[styles.summaryCount, { color: combinedProgress >= 1 ? '#22c55e' : colors.tint }]}>
+                <Text style={[styles.summaryTitle, { color: colors.text }]}>
+                  {"Today's progress"}
+                </Text>
+                <Text
+                  style={[
+                    styles.summaryCount,
+                    { color: combinedProgress >= 1 ? "#22c55e" : colors.tint },
+                  ]}
+                >
                   {combinedDone}/{combinedTotal}
                 </Text>
               </View>
-              <View style={[styles.progressTrackBg, { backgroundColor: scheme === 'dark' ? '#333' : '#e0e0e0' }]}>
+              <View
+                style={[
+                  styles.progressTrackBg,
+                  { backgroundColor: scheme === "dark" ? "#333" : "#e0e0e0" },
+                ]}
+              >
                 <Animated.View
                   style={[
                     styles.progressFill,
-                    { width: progressBarWidth, backgroundColor: progressBarColor },
+                    {
+                      width: progressBarWidth,
+                      backgroundColor: progressBarColor,
+                    },
                   ]}
                 />
               </View>
@@ -196,6 +243,7 @@ export default function TodayScreen() {
             onRefresh={handleRefresh}
             tintColor={colors.tint}
             colors={[colors.tint]}
+            progressBackgroundColor={scheme === "dark" ? "#1f2123" : "#ffffff"}
           />
         }
       >
@@ -208,13 +256,25 @@ export default function TodayScreen() {
         >
           <View style={styles.sectionHeaderLeft}>
             <Ionicons
-              name={habitsExpanded ? 'chevron-down' : 'chevron-forward'}
+              name={habitsExpanded ? "chevron-down" : "chevron-forward"}
               size={18}
               color={colors.icon}
             />
-            <Text style={[styles.sectionHeader, { color: colors.text }]}>Habits</Text>
+            <Text style={[styles.sectionHeader, { color: colors.text }]}>
+              Habits
+            </Text>
           </View>
-          <Text style={[styles.sectionCount, { color: habitsDone === habitsTotal && habitsTotal > 0 ? '#22c55e' : colors.icon }]}>
+          <Text
+            style={[
+              styles.sectionCount,
+              {
+                color:
+                  habitsDone === habitsTotal && habitsTotal > 0
+                    ? "#22c55e"
+                    : colors.icon,
+              },
+            ]}
+          >
             {habitsDone}/{habitsTotal}
           </Text>
         </TouchableOpacity>
@@ -235,8 +295,10 @@ export default function TodayScreen() {
               const flashColor = flashAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [
-                  'rgba(34,197,94,0)',
-                  scheme === 'dark' ? 'rgba(34,197,94,0.28)' : 'rgba(34,197,94,0.16)',
+                  "rgba(34,197,94,0)",
+                  scheme === "dark"
+                    ? "rgba(34,197,94,0.28)"
+                    : "rgba(34,197,94,0.16)",
                 ],
               });
 
@@ -245,35 +307,48 @@ export default function TodayScreen() {
                   key={habit.id}
                   style={[
                     styles.itemRow,
-                    { borderBottomColor: borderColor, backgroundColor: flashColor },
+                    {
+                      borderBottomColor: borderColor,
+                      backgroundColor: flashColor,
+                    },
                   ]}
                 >
                   <View style={styles.itemInfo}>
-                    <Text
-                      style={[
-                        styles.itemTitle,
-                        { color: colors.text },
-                      ]}
-                    >
+                    <Text style={[styles.itemTitle, { color: colors.text }]}>
                       {habit.title}
                     </Text>
                     <View style={styles.streakRow}>
-                      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                        <Ionicons name="flame" size={13} color={streak > 0 ? '#f97316' : colors.icon} />
+                      <Animated.View
+                        style={{ transform: [{ scale: scaleAnim }] }}
+                      >
+                        <Ionicons
+                          name="flame"
+                          size={13}
+                          color={streak > 0 ? "#f97316" : colors.icon}
+                        />
                       </Animated.View>
-                      <Text style={[styles.streakText, { color: streak > 0 ? '#f97316' : colors.icon }]}>
-                        {streak} day{streak === 1 ? '' : 's'}
+                      <Text
+                        style={[
+                          styles.streakText,
+                          { color: streak > 0 ? "#f97316" : colors.icon },
+                        ]}
+                      >
+                        {streak} day{streak === 1 ? "" : "s"}
                       </Text>
                     </View>
                   </View>
 
-                  {habit.type === 'boolean' ? (
-                    <TouchableOpacity onPress={() => handleToggleBooleanHabit(habit)}>
-                      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                  {habit.type === "boolean" ? (
+                    <TouchableOpacity
+                      onPress={() => handleToggleBooleanHabit(habit)}
+                    >
+                      <Animated.View
+                        style={{ transform: [{ scale: scaleAnim }] }}
+                      >
                         <Ionicons
-                          name={completed ? 'checkbox' : 'square-outline'}
+                          name={completed ? "checkbox" : "square-outline"}
                           size={26}
-                          color={completed ? '#22c55e' : colors.icon}
+                          color={completed ? "#22c55e" : colors.icon}
                         />
                       </Animated.View>
                     </TouchableOpacity>
@@ -288,11 +363,11 @@ export default function TodayScreen() {
                       <Text
                         style={[
                           styles.counterText,
-                          { color: completed ? '#22c55e' : colors.text },
+                          { color: completed ? "#22c55e" : colors.text },
                         ]}
                       >
                         {value}/{habit.target}
-                        {habit.type === 'duration' ? 'm' : ''}
+                        {habit.type === "duration" ? "m" : ""}
                       </Text>
                       <TouchableOpacity
                         onPress={() => handleIncrementHabit(habit, 1)}
@@ -314,19 +389,25 @@ export default function TodayScreen() {
         >
           <View style={styles.sectionHeaderLeft}>
             <Ionicons
-              name={tasksExpanded ? 'chevron-down' : 'chevron-forward'}
+              name={tasksExpanded ? "chevron-down" : "chevron-forward"}
               size={18}
               color={colors.icon}
             />
-            <Text style={[styles.sectionHeader, { color: colors.text }]}>Tasks</Text>
+            <Text style={[styles.sectionHeader, { color: colors.text }]}>
+              Tasks
+            </Text>
           </View>
-          <Text style={[styles.sectionCount, { color: colors.icon }]}>{openTasks.length} open</Text>
+          <Text style={[styles.sectionCount, { color: colors.icon }]}>
+            {openTasks.length} open
+          </Text>
         </TouchableOpacity>
 
         {tasksExpanded &&
           (openTasks.length === 0 ? (
             <Text style={[styles.emptyText, { color: colors.icon }]}>
-              {tasks.length > 0 ? 'All tasks completed! 🎉' : 'No tasks yet — add some in the Tasks tab'}
+              {tasks.length > 0
+                ? "All tasks completed! 🎉"
+                : "No tasks yet — add some in the Tasks tab"}
             </Text>
           ) : (
             <>
@@ -336,17 +417,30 @@ export default function TodayScreen() {
                 return (
                   <View
                     key={task.id}
-                    style={[
-                      styles.itemRow,
-                      { borderBottomColor: borderColor },
-                    ]}
+                    style={[styles.itemRow, { borderBottomColor: borderColor }]}
                   >
-                    <TouchableOpacity onPress={() => handleToggleTask(task)} style={styles.checkbox}>
-                      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                        <Ionicons name="square-outline" size={24} color={colors.icon} />
+                    <TouchableOpacity
+                      onPress={() => handleToggleTask(task)}
+                      style={styles.checkbox}
+                    >
+                      <Animated.View
+                        style={{ transform: [{ scale: scaleAnim }] }}
+                      >
+                        <Ionicons
+                          name="square-outline"
+                          size={24}
+                          color={colors.icon}
+                        />
                       </Animated.View>
                     </TouchableOpacity>
-                    <Text style={[styles.itemTitle, { color: colors.text, flex: 1 }]}>{task.title}</Text>
+                    <Text
+                      style={[
+                        styles.itemTitle,
+                        { color: colors.text, flex: 1 },
+                      ]}
+                    >
+                      {task.title}
+                    </Text>
                   </View>
                 );
               })}
@@ -366,50 +460,86 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
-  greeting: { fontSize: 26, fontWeight: '700' },
+  greeting: { fontSize: 26, fontWeight: "700" },
   date: { fontSize: 15, marginTop: 2, marginBottom: 16 },
   summaryCard: { borderRadius: 16, padding: 16 },
-  summaryTextRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  summaryTitle: { fontSize: 15, fontWeight: '600' },
-  summaryCount: { fontSize: 15, fontWeight: '700' },
-  progressTrackBg: { height: 8, borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 4 },
+  summaryTextRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  summaryTitle: { fontSize: 15, fontWeight: "600" },
+  summaryCount: { fontSize: 15, fontWeight: "700" },
+  progressTrackBg: { height: 8, borderRadius: 4, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 4 },
   sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
     paddingVertical: 4,
   },
-  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionHeader: { fontSize: 20, fontWeight: '700' },
-  sectionCount: { fontSize: 14, fontWeight: '500' },
-  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, gap: 12 },
+  sectionHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  sectionHeader: { fontSize: 20, fontWeight: "700" },
+  sectionCount: { fontSize: 14, fontWeight: "500" },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
   itemInfo: { flex: 1 },
-  itemTitle: { fontSize: 15, fontWeight: '500' },
-  completedItemTitle: { fontWeight: '600' },
-  streakRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  streakText: { fontSize: 12, fontWeight: '500' },
+  itemTitle: { fontSize: 15, fontWeight: "500" },
+  completedItemTitle: { fontWeight: "600" },
+  streakRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 3,
+  },
+  streakText: { fontSize: 12, fontWeight: "500" },
   checkbox: { padding: 2 },
-  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  counterRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   counterButton: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(128,128,128,0.15)',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(128,128,128,0.15)",
   },
-  counterText: { fontSize: 13, fontWeight: '600', minWidth: 46, textAlign: 'center' },
+  counterText: {
+    fontSize: 13,
+    fontWeight: "600",
+    minWidth: 46,
+    textAlign: "center",
+  },
   emptyText: { fontSize: 14, marginBottom: 16 },
-  doneLabel: { fontSize: 13, fontWeight: '600', marginTop: 12, marginBottom: 4 },
-  greetingRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-greetingText: { flex: 1 },
-avatarButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
-avatarText: { fontSize: 15, fontWeight: '700' },
-avatarImage: {
-  width: 40,
-  height: 40,
-  borderRadius: 20,
-},
+  doneLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  greetingRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  greetingText: { flex: 1 },
+  avatarButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 12,
+  },
+  avatarText: { fontSize: 15, fontWeight: "700" },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
 });
