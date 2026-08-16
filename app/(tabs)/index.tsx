@@ -31,6 +31,19 @@ function getGreeting() {
   return "Good evening";
 }
 
+function useLiveGreeting() {
+  const [greeting, setGreeting] = useState(getGreeting());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setGreeting(getGreeting());
+    }, 60000); // recheck every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  return greeting;
+}
+
 export default function TodayScreen() {
   const { tasks, loadTasks, toggleTask } = useTaskStore();
   const {
@@ -46,6 +59,7 @@ export default function TodayScreen() {
   // const colors = Colors[scheme ?? 'light'];
   const { scheme, colors } = useAppTheme();
   const { getFlashAnim, getScaleAnim, celebrate } = useCelebration();
+  const greeting = useLiveGreeting();
 
   const [habitsExpanded, setHabitsExpanded] = useState(true);
   const [tasksExpanded, setTasksExpanded] = useState(true);
@@ -156,7 +170,7 @@ export default function TodayScreen() {
         <View style={styles.greetingRow}>
           <View style={styles.greetingText}>
             <Text style={[styles.greeting, { color: colors.text }]}>
-              {getGreeting()}
+              {greeting}
             </Text>
             <Text style={[styles.date, { color: colors.icon }]}>
               {format(new Date(), "EEEE, MMMM d")}
@@ -174,7 +188,7 @@ export default function TodayScreen() {
                 source={{ uri: profile.avatar_url }}
                 style={styles.avatarImage}
               />
-            ) : (
+            ) : displayName ? (
               <Text
                 style={[
                   styles.avatarText,
@@ -183,6 +197,12 @@ export default function TodayScreen() {
               >
                 {initials}
               </Text>
+            ) : (
+              <Ionicons
+                name="person"
+                size={20}
+                color={scheme === "dark" ? "#151718" : "#fff"}
+              />
             )}
           </TouchableOpacity>
         </View>
@@ -524,7 +544,7 @@ const styles = StyleSheet.create({
   },
   greetingRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
   },
   greetingText: { flex: 1 },
