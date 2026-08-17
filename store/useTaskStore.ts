@@ -16,7 +16,7 @@ type TaskStore = {
   bulkComplete: (ids: string[]) => Promise<void>;
   bulkDelete: (ids: string[]) => Promise<void>;
   reorderTasks: (orderedIds: string[]) => Promise<void>;
-  setTaskReminder: (id: string, time: string | null) => Promise<void>;
+  setTaskReminder: (id: string, time: string | null, date?: string | null) => Promise<void>;
 };
 
 function nowISO() {
@@ -174,17 +174,18 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     scheduleSync();
   },
 
-  setTaskReminder: async (id, time) => {
+  setTaskReminder: async (id, time, date = null) => {
     const database = await getDatabase();
     await database.runAsync(
-      'UPDATE tasks SET reminder_time = ?, synced = 0 WHERE id = ?',
+      'UPDATE tasks SET reminder_time = ?, reminder_date = ?, synced = 0 WHERE id = ?',
       time,
+      time ? date : null,
       id
     );
 
     const task = get().tasks.find((t) => t.id === id);
     if (time && task) {
-      await scheduleTaskReminder(id, task.title, time);
+      await scheduleTaskReminder(id, task.title, time, date);
     } else {
       await cancelTaskReminder(id);
     }

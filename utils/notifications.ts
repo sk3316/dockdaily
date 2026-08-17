@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import { getLocalDateString } from "@/utils/streak";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -111,6 +112,7 @@ export async function scheduleHabitReminder(
   habitId: string,
   title: string,
   reminderTime: string,
+  reminderDate?: string | null // YYYY-MM-DD, optional start date
 ): Promise<void> {
   const [hour, minute] = reminderTime.split(":").map(Number);
   const identifier = habitReminderId(habitId);
@@ -118,19 +120,44 @@ export async function scheduleHabitReminder(
   await Notifications.cancelScheduledNotificationAsync(identifier).catch(
     () => {},
   );
-  await Notifications.scheduleNotificationAsync({
-    identifier,
-    content: {
-      title: "✅ Habit reminder",
-      body: `Time for "${title}"`,
-      sound: true,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
-    },
-  });
+
+  const todayKey = getLocalDateString();
+
+  if (reminderDate && reminderDate > todayKey) {
+    // Start date hasn't arrived yet — schedule a ONE-TIME reminder for that exact
+    // date+time. Once the app is opened on/after that date, refreshHabitReminders()
+    // will re-call this function and it'll fall into the daily-recurring branch below.
+    const [year, month, day] = reminderDate.split("-").map(Number);
+    const startDateTime = new Date(year, month - 1, day, hour, minute, 0);
+
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        title: "✅ Habit reminder",
+        body: `Time for "${title}"`,
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: startDateTime,
+      },
+    });
+  } else {
+    // No start date, or the start date has arrived/passed — normal daily recurring
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        title: "✅ Habit reminder",
+        body: `Time for "${title}"`,
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour,
+        minute,
+      },
+    });
+  }
 }
 
 export async function cancelHabitReminder(habitId: string): Promise<void> {
@@ -143,21 +170,35 @@ export async function scheduleTaskReminder(
   taskId: string,
   title: string,
   reminderTime: string,
+  reminderDate?: string | null // YYYY-MM-DD
 ): Promise<void> {
   const [hour, minute] = reminderTime.split(":").map(Number);
   const identifier = taskReminderId(taskId);
 
-  // Tasks are one-time — schedule for the next occurrence of this time (today or tomorrow)
-  const now = new Date();
-  const target = new Date();
-  target.setHours(hour, minute, 0, 0);
-  if (target <= now) {
-    target.setDate(target.getDate() + 1);
-  }
-
   await Notifications.cancelScheduledNotificationAsync(identifier).catch(
     () => {},
   );
+
+  let target: Date;
+
+  if (reminderDate) {
+    const [year, month, day] = reminderDate.split("-").map(Number);
+    target = new Date(year, month - 1, day, hour, minute, 0);
+  } else {
+    // Backward-compatible fallback for any reminder set before date picking existed
+    const now = new Date();
+    target = new Date();
+    target.setHours(hour, minute, 0, 0);
+    if (target <= now) {
+      target.setDate(target.getDate() + 1);
+    }
+  }
+
+  // Safety: never schedule something already in the past
+  if (target <= new Date()) {
+    return;
+  }
+
   await Notifications.scheduleNotificationAsync({
     identifier,
     content: {
@@ -176,6 +217,29 @@ export async function cancelTaskReminder(taskId: string): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(
     taskReminderId(taskId),
   ).catch(() => {});
+}
+
+// Re-evaluates every habit's reminder schedule — call this on app foreground/init.
+// Habits with a future start date will self-correct into daily-recurring mode
+// once that date arrives, with zero extra state tracking needed.
+export async function refreshHabitReminders(
+  habits: {
+    id: string;
+    title: string;
+    reminder_time?: string | null;
+    reminder_date?: string | null;
+  }[],
+): Promise<void> {
+  for (const habit of habits) {
+    if (habit.reminder_time) {
+      await scheduleHabitReminder(
+        habit.id,
+        habit.title,
+        habit.reminder_time,
+        habit.reminder_date,
+      );
+    }
+  }
 }
 
 // ─────────────────────────────────────────────

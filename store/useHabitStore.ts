@@ -28,7 +28,7 @@ type HabitStore = {
   logHabit: (habitId: string, value: number, target: number) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
   reorderHabits: (orderedIds: string[]) => Promise<void>;
-  setHabitReminder: (id: string, time: string | null) => Promise<void>;
+  setHabitReminder: (id: string, time: string | null, date?: string | null) => Promise<void>;
   checkForBrokenStreaks: () => Promise<BrokenStreak[]>;
 };
 
@@ -176,17 +176,18 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     scheduleSync();
   },
 
-  setHabitReminder: async (id, time) => {
+  setHabitReminder: async (id, time, date = null) => {
     const database = await getDatabase();
     await database.runAsync(
-      'UPDATE habits SET reminder_time = ?, synced = 0 WHERE id = ?',
+      'UPDATE habits SET reminder_time = ?, reminder_date = ?, synced = 0 WHERE id = ?',
       time,
+      time ? date : null,
       id
     );
 
     const habit = get().habits.find((h) => h.id === id);
     if (time && habit) {
-      await scheduleHabitReminder(id, habit.title, time);
+      await scheduleHabitReminder(id, habit.title, time, date);
     } else {
       await cancelHabitReminder(id);
     }

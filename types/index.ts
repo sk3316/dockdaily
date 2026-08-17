@@ -9,6 +9,7 @@ export type Task = {
   created_at: string;
   sort_order: number;
   reminder_time?: string | null; // HH:MM format
+  reminder_date?: string | null; // YYYY-MM-DD
 };
 
 export type Habit = {
@@ -21,6 +22,7 @@ export type Habit = {
   created_at: string;
   sort_order: number;
   reminder_time?: string | null; // HH:MM format
+  reminder_date?: string | null; // YYYY-MM-DD, start date for daily reminders
   last_known_streak?: number; // used for rescue detection
 };
 

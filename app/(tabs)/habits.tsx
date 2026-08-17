@@ -1,4 +1,5 @@
 import AISuggestionSheet from "@/components/AISuggestionSheet";
+import ReminderDrawer from "@/components/ReminderDrawer";
 import { useAnimatedProgress } from "@/hooks/use-animated-progress";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useCelebration } from "@/hooks/use-celebration";
@@ -67,9 +68,7 @@ export default function HabitsScreen() {
   const [editingCounterText, setEditingCounterText] = useState("");
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitleText, setEditingTitleText] = useState("");
-  const [reminderPickerId, setReminderPickerId] = useState<string | null>(null);
-  const [pickerHour, setPickerHour] = useState(9);
-  const [pickerMinute, setPickerMinute] = useState(0);
+  const [reminderHabit, setReminderHabit] = useState<Habit | null>(null);
   const { scheme, colors } = useAppTheme();
   const { getFlashAnim, getScaleAnim, celebrate } = useCelebration();
   const { fetchSuggestions } = useAIStore();
@@ -187,23 +186,8 @@ export default function HabitsScreen() {
     setEditingTitleText("");
   };
 
-  const toggleReminderPicker = (habit: Habit) => {
-    if (reminderPickerId === habit.id) {
-      setReminderPickerId(null);
-      return;
-    }
-    if (habit.reminder_time) {
-      const [h, m] = habit.reminder_time.split(":").map(Number);
-      setPickerHour(h);
-      setPickerMinute(m);
-    } else {
-      setPickerHour(9);
-      setPickerMinute(0);
-    }
-    setReminderPickerId(habit.id);
-  };
-
-  const commitReminder = async (habit: Habit) => {
+  const handleSaveReminder = async (time: string, date: string | null) => {
+    if (!reminderHabit) return;
     const granted = await requestNotificationPermissions();
     if (!granted) {
       Alert.alert(
@@ -212,14 +196,12 @@ export default function HabitsScreen() {
       );
       return;
     }
-    const formatted = `${String(pickerHour).padStart(2, "0")}:${String(pickerMinute).padStart(2, "0")}`;
-    await setHabitReminder(habit.id, formatted);
-    setReminderPickerId(null);
+    await setHabitReminder(reminderHabit.id, time, date);
   };
 
-  const removeReminder = async (habit: Habit) => {
-    await setHabitReminder(habit.id, null);
-    setReminderPickerId(null);
+  const handleRemoveReminder = async () => {
+    if (!reminderHabit) return;
+    await setHabitReminder(reminderHabit.id, null);
   };
 
   const renderItem = ({ item, drag, isActive }: RenderItemParams<Habit>) => {
@@ -229,7 +211,6 @@ export default function HabitsScreen() {
     const streak = calculateStreak(allLogs, item.id);
     const isEditingCounter = editingCounterId === item.id;
     const isEditingTitle = editingTitleId === item.id;
-    const isPickerOpen = reminderPickerId === item.id;
     const flashAnim = getFlashAnim(item.id);
     const scaleAnim = getScaleAnim(item.id);
     const flashColor = flashAnim.interpolate({
@@ -242,243 +223,162 @@ export default function HabitsScreen() {
 
     return (
       <ScaleDecorator>
-        <View
+        <AnimatedTouchableOpacity
+          onLongPress={drag}
+          disabled={isActive}
+          activeOpacity={1}
           style={[
-            styles.habitWrapper,
-            { borderBottomColor: scheme === "dark" ? "#2a2c2e" : "#eee" },
+            styles.habitRow,
+            {
+              borderBottomColor: scheme === "dark" ? "#2a2c2e" : "#eee",
+              backgroundColor: flashColor,
+            },
+            isActive && {
+              backgroundColor: scheme === "dark" ? "#1f2123" : "#f9f9f9",
+              opacity: 0.7,
+            },
           ]}
         >
-          <AnimatedTouchableOpacity
-            onLongPress={drag}
-            disabled={isActive}
-            activeOpacity={1}
-            style={[
-              styles.habitRow,
-              { backgroundColor: flashColor },
-              isActive && {
-                backgroundColor: scheme === "dark" ? "#1f2123" : "#f9f9f9",
-                opacity: 0.7,
-              },
-            ]}
-          >
-            <View style={styles.habitInfo}>
-              {isEditingTitle ? (
-                <TextInput
-                  style={[
-                    styles.habitTitleInput,
-                    { color: colors.text, borderColor: colors.tint },
-                  ]}
-                  value={editingTitleText}
-                  onChangeText={setEditingTitleText}
-                  onSubmitEditing={() => saveTitleEdit(item)}
-                  onBlur={() => saveTitleEdit(item)}
-                  autoFocus
-                  selectTextOnFocus
-                  returnKeyType="done"
-                />
-              ) : (
-                <TouchableOpacity
-                  onPress={() => startEditingTitle(item)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.habitTitle, { color: colors.text }]}>
-                    {item.title}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {!isEditingTitle && (
-                <View style={styles.streakRow}>
-                  <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                    <Ionicons
-                      name="flame"
-                      size={14}
-                      color={streak > 0 ? "#f97316" : colors.icon}
-                    />
-                  </Animated.View>
-                  <Text
-                    style={[
-                      styles.streakText,
-                      { color: streak > 0 ? "#f97316" : colors.icon },
-                    ]}
-                  >
-                    {streak} day{streak === 1 ? "" : "s"}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {item.type === "boolean" ? (
-              <TouchableOpacity
-                onPress={() => handleToggleBoolean(item)}
-                style={styles.checkbox}
-              >
-                <Ionicons
-                  name={completed ? "checkbox" : "square-outline"}
-                  size={28}
-                  color={completed ? "#22c55e" : colors.icon}
-                />
-              </TouchableOpacity>
+          <View style={styles.habitInfo}>
+            {isEditingTitle ? (
+              <TextInput
+                style={[
+                  styles.habitTitleInput,
+                  { color: colors.text, borderColor: colors.tint },
+                ]}
+                value={editingTitleText}
+                onChangeText={setEditingTitleText}
+                onSubmitEditing={() => saveTitleEdit(item)}
+                onBlur={() => saveTitleEdit(item)}
+                autoFocus
+                selectTextOnFocus
+                returnKeyType="done"
+              />
             ) : (
-              <View style={styles.counterRow}>
-                <TouchableOpacity
-                  onPress={() => handleIncrement(item, -1)}
-                  style={styles.counterButton}
+              <TouchableOpacity
+                onPress={() => startEditingTitle(item)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.habitTitle, { color: colors.text }]}>
+                  {item.title}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {!isEditingTitle && (
+              <View style={styles.streakRow}>
+                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                  <Ionicons
+                    name="flame"
+                    size={14}
+                    color={streak > 0 ? "#f97316" : colors.icon}
+                  />
+                </Animated.View>
+                <Text
+                  style={[
+                    styles.streakText,
+                    { color: streak > 0 ? "#f97316" : colors.icon },
+                  ]}
                 >
-                  <Ionicons name="remove" size={18} color={colors.text} />
-                </TouchableOpacity>
-
-                {isEditingCounter ? (
-                  <View style={styles.counterEditRow}>
-                    <TextInput
-                      style={[
-                        styles.counterInput,
-                        { color: colors.text, borderColor: colors.tint },
-                      ]}
-                      value={editingCounterText}
-                      onChangeText={(text) =>
-                        setEditingCounterText(text.replace(/[^0-9]/g, ""))
-                      }
-                      onSubmitEditing={() => saveCounterEdit(item)}
-                      onBlur={() => saveCounterEdit(item)}
-                      keyboardType="number-pad"
-                      autoFocus
-                      selectTextOnFocus
-                      maxLength={5}
-                    />
-                    <Text
-                      style={[styles.counterSuffix, { color: colors.text }]}
-                    >
-                      /{item.target}
-                      {item.type === "duration" ? "m" : ""}
-                    </Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity onPress={() => startEditingCounter(item)}>
-                    <Text
-                      style={[
-                        styles.counterText,
-                        { color: completed ? "#22c55e" : colors.text },
-                      ]}
-                    >
-                      {value}/{item.target}
-                      {item.type === "duration" ? "m" : ""}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  onPress={() => handleIncrement(item, 1)}
-                  style={styles.counterButton}
-                >
-                  <Ionicons name="add" size={18} color={colors.text} />
-                </TouchableOpacity>
+                  {streak} day{streak === 1 ? "" : "s"}
+                </Text>
               </View>
             )}
+          </View>
 
-            <View style={styles.rightActions}>
-              <TouchableOpacity
-                onPress={() => toggleReminderPicker(item)}
-                style={{ padding: 4 }}
-              >
-                <Ionicons
-                  name={
-                    item.reminder_time
-                      ? "notifications"
-                      : "notifications-outline"
-                  }
-                  size={18}
-                  color={item.reminder_time ? colors.tint : colors.icon}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => deleteHabit(item.id)}
-                style={{ padding: 4 }}
-              >
-                <Ionicons name="trash-outline" size={18} color="#ef4444" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onLongPress={drag}
-                delayLongPress={0}
-                style={{ padding: 4 }}
-              >
-                <Ionicons name="menu-outline" size={20} color={colors.icon} />
-              </TouchableOpacity>
-            </View>
-          </AnimatedTouchableOpacity>
-
-          {isPickerOpen && (
-            <View
-              style={[
-                styles.reminderPicker,
-                {
-                  borderTopColor: scheme === "dark" ? "#2a2c2e" : "#eee",
-                  backgroundColor: scheme === "dark" ? "#1a1c1e" : "#fafafa",
-                },
-              ]}
+          {item.type === "boolean" ? (
+            <TouchableOpacity
+              onPress={() => handleToggleBoolean(item)}
+              style={styles.checkbox}
             >
-              <View style={styles.timePickerCol}>
-                <TouchableOpacity
-                  onPress={() => setPickerHour((h) => (h + 1) % 24)}
-                  style={styles.timeArrow}
-                >
-                  <Ionicons name="chevron-up" size={18} color={colors.tint} />
-                </TouchableOpacity>
-                <Text style={[styles.timeValue, { color: colors.text }]}>
-                  {String(pickerHour).padStart(2, "0")}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setPickerHour((h) => (h - 1 + 24) % 24)}
-                  style={styles.timeArrow}
-                >
-                  <Ionicons name="chevron-down" size={18} color={colors.tint} />
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.timeSep, { color: colors.text }]}>:</Text>
-              <View style={styles.timePickerCol}>
-                <TouchableOpacity
-                  onPress={() => setPickerMinute((m) => (m + 5) % 60)}
-                  style={styles.timeArrow}
-                >
-                  <Ionicons name="chevron-up" size={18} color={colors.tint} />
-                </TouchableOpacity>
-                <Text style={[styles.timeValue, { color: colors.text }]}>
-                  {String(pickerMinute).padStart(2, "0")}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setPickerMinute((m) => (m - 5 + 60) % 60)}
-                  style={styles.timeArrow}
-                >
-                  <Ionicons name="chevron-down" size={18} color={colors.tint} />
-                </TouchableOpacity>
-              </View>
+              <Ionicons
+                name={completed ? "checkbox" : "square-outline"}
+                size={28}
+                color={completed ? "#22c55e" : colors.icon}
+              />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.counterRow}>
               <TouchableOpacity
-                onPress={() => commitReminder(item)}
-                style={[
-                  styles.reminderSetButton,
-                  { backgroundColor: colors.tint },
-                ]}
+                onPress={() => handleIncrement(item, -1)}
+                style={styles.counterButton}
               >
-                <Text
-                  style={{
-                    color: scheme === "dark" ? "#151718" : "#fff",
-                    fontWeight: "700",
-                    fontSize: 13,
-                  }}
-                >
-                  Set
-                </Text>
+                <Ionicons name="remove" size={18} color={colors.text} />
               </TouchableOpacity>
-              {item.reminder_time && (
-                <TouchableOpacity
-                  onPress={() => removeReminder(item)}
-                  style={styles.reminderRemoveButton}
-                >
-                  <Ionicons name="close-circle" size={22} color="#ef4444" />
+
+              {isEditingCounter ? (
+                <View style={styles.counterEditRow}>
+                  <TextInput
+                    style={[
+                      styles.counterInput,
+                      { color: colors.text, borderColor: colors.tint },
+                    ]}
+                    value={editingCounterText}
+                    onChangeText={(text) =>
+                      setEditingCounterText(text.replace(/[^0-9]/g, ""))
+                    }
+                    onSubmitEditing={() => saveCounterEdit(item)}
+                    onBlur={() => saveCounterEdit(item)}
+                    keyboardType="number-pad"
+                    autoFocus
+                    selectTextOnFocus
+                    maxLength={5}
+                  />
+                  <Text style={[styles.counterSuffix, { color: colors.text }]}>
+                    /{item.target}
+                    {item.type === "duration" ? "m" : ""}
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => startEditingCounter(item)}>
+                  <Text
+                    style={[
+                      styles.counterText,
+                      { color: completed ? "#22c55e" : colors.text },
+                    ]}
+                  >
+                    {value}/{item.target}
+                    {item.type === "duration" ? "m" : ""}
+                  </Text>
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                onPress={() => handleIncrement(item, 1)}
+                style={styles.counterButton}
+              >
+                <Ionicons name="add" size={18} color={colors.text} />
+              </TouchableOpacity>
             </View>
           )}
-        </View>
+
+          <View style={styles.rightActions}>
+            <TouchableOpacity
+              onPress={() => setReminderHabit(item)}
+              style={{ padding: 4 }}
+            >
+              <Ionicons
+                name={
+                  item.reminder_time ? "notifications" : "notifications-outline"
+                }
+                size={18}
+                color={item.reminder_time ? colors.tint : colors.icon}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => deleteHabit(item.id)}
+              style={{ padding: 4 }}
+            >
+              <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onLongPress={drag}
+              delayLongPress={0}
+              style={{ padding: 4 }}
+            >
+              <Ionicons name="menu-outline" size={20} color={colors.icon} />
+            </TouchableOpacity>
+          </View>
+        </AnimatedTouchableOpacity>
       </ScaleDecorator>
     );
   };
@@ -635,7 +535,19 @@ export default function HabitsScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
       <AISuggestionSheet />
+
+      <ReminderDrawer
+        visible={reminderHabit !== null}
+        onClose={() => setReminderHabit(null)}
+        itemTitle={reminderHabit?.title ?? ""}
+        itemType="habit"
+        currentTime={reminderHabit?.reminder_time}
+        currentDate={reminderHabit?.reminder_date}
+        onSave={handleSaveReminder}
+        onRemove={handleRemoveReminder}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -649,11 +561,11 @@ const styles = StyleSheet.create({
   progressTrackBg: { height: 6, borderRadius: 3, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 3 },
   progressLabel: { fontSize: 13, fontWeight: "500" },
-  habitWrapper: { borderBottomWidth: 1 },
   habitRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 14,
+    borderBottomWidth: 1,
     gap: 12,
   },
   habitInfo: { flex: 1 },
@@ -738,28 +650,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rightActions: { flexDirection: "row", alignItems: "center", gap: 4 },
-  reminderPicker: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-  },
-  timePickerCol: { alignItems: "center", gap: 2 },
-  timeArrow: { padding: 2 },
-  timeValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    minWidth: 30,
-    textAlign: "center",
-  },
-  timeSep: { fontSize: 18, fontWeight: "700" },
-  reminderSetButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  reminderRemoveButton: { padding: 4, marginLeft: 4 },
 });

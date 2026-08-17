@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at TEXT NOT NULL DEFAULT '',
   synced INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  reminder_time TEXT
+  reminder_time TEXT,
+  reminder_date TEXT
 );
 `;
 
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS habits (
   synced INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   reminder_time TEXT,
+  reminder_date TEXT,
   last_known_streak INTEGER NOT NULL DEFAULT 0
 );
 `;

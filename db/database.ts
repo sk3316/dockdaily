@@ -57,6 +57,18 @@ export async function initDatabase() {
     // Column already exists — ignore
   }
 
+  // NEW: Add reminder_date column for date+time reminders
+  try {
+    await database.execAsync('ALTER TABLE tasks ADD COLUMN reminder_date TEXT');
+  } catch (_) {
+    // Column already exists — ignore
+  }
+  try {
+    await database.execAsync('ALTER TABLE habits ADD COLUMN reminder_date TEXT');
+  } catch (_) {
+    // Column already exists — ignore
+  }
+
   // Deduplicate habit_logs before adding unique index
   try {
     await database.execAsync(`

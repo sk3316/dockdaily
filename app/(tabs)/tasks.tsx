@@ -1,3 +1,4 @@
+import ReminderDrawer from "@/components/ReminderDrawer";
 import { useAnimatedProgress } from "@/hooks/use-animated-progress";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useCelebration } from "@/hooks/use-celebration";
@@ -53,9 +54,7 @@ export default function TasksScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
-  const [reminderPickerId, setReminderPickerId] = useState<string | null>(null);
-  const [pickerHour, setPickerHour] = useState(9);
-  const [pickerMinute, setPickerMinute] = useState(0);
+  const [reminderTask, setReminderTask] = useState<Task | null>(null);
   const { scheme, colors } = useAppTheme();
   const { getFlashAnim, getScaleAnim, celebrate } = useCelebration();
 
@@ -148,23 +147,8 @@ export default function TasksScreen() {
     toggleTask(item.id);
   };
 
-  const toggleReminderPicker = (task: Task) => {
-    if (reminderPickerId === task.id) {
-      setReminderPickerId(null);
-      return;
-    }
-    if (task.reminder_time) {
-      const [h, m] = task.reminder_time.split(":").map(Number);
-      setPickerHour(h);
-      setPickerMinute(m);
-    } else {
-      setPickerHour(9);
-      setPickerMinute(0);
-    }
-    setReminderPickerId(task.id);
-  };
-
-  const commitReminder = async (task: Task) => {
+  const handleSaveReminder = async (time: string, date: string | null) => {
+    if (!reminderTask) return;
     const granted = await requestNotificationPermissions();
     if (!granted) {
       Alert.alert(
@@ -173,20 +157,17 @@ export default function TasksScreen() {
       );
       return;
     }
-    const formatted = `${String(pickerHour).padStart(2, "0")}:${String(pickerMinute).padStart(2, "0")}`;
-    await setTaskReminder(task.id, formatted);
-    setReminderPickerId(null);
+    await setTaskReminder(reminderTask.id, time, date);
   };
 
-  const removeReminder = async (task: Task) => {
-    await setTaskReminder(task.id, null);
-    setReminderPickerId(null);
+  const handleRemoveReminder = async () => {
+    if (!reminderTask) return;
+    await setTaskReminder(reminderTask.id, null);
   };
 
   const renderItem = ({ item, drag, isActive }: RenderItemParams<Task>) => {
     const isSelected = selectedIds.has(item.id);
     const isEditing = editingId === item.id;
-    const isPickerOpen = reminderPickerId === item.id;
     const flashAnim = getFlashAnim(item.id);
     const scaleAnim = getScaleAnim(item.id);
     const flashColor = flashAnim.interpolate({
@@ -199,199 +180,120 @@ export default function TasksScreen() {
 
     return (
       <ScaleDecorator>
-        <View
+        <AnimatedTouchableOpacity
+          activeOpacity={selectMode ? 0.6 : 1}
+          onPress={() => (selectMode ? toggleSelected(item.id) : undefined)}
+          onLongPress={selectMode ? undefined : drag}
+          disabled={isActive}
           style={[
-            styles.taskWrapper,
+            styles.taskRow,
             { borderBottomColor: scheme === "dark" ? "#2a2c2e" : "#eee" },
+            selectMode &&
+              isSelected && {
+                backgroundColor: scheme === "dark" ? "#1f2937" : "#eef2ff",
+              },
+            isActive && {
+              backgroundColor: scheme === "dark" ? "#1f2123" : "#f9f9f9",
+              opacity: 0.7,
+            },
+            { backgroundColor: flashColor },
           ]}
         >
-          <AnimatedTouchableOpacity
-            activeOpacity={selectMode ? 0.6 : 1}
-            onPress={() => (selectMode ? toggleSelected(item.id) : undefined)}
-            onLongPress={selectMode ? undefined : drag}
-            disabled={isActive}
-            style={[
-              styles.taskRow,
-              selectMode &&
-                isSelected && {
-                  backgroundColor: scheme === "dark" ? "#1f2937" : "#eef2ff",
-                },
-              isActive && {
-                backgroundColor: scheme === "dark" ? "#1f2123" : "#f9f9f9",
-                opacity: 0.7,
-              },
-              { backgroundColor: flashColor },
-            ]}
+          <TouchableOpacity
+            onPress={() => handleCheckboxPress(item)}
+            style={styles.checkbox}
           >
-            <TouchableOpacity
-              onPress={() => handleCheckboxPress(item)}
-              style={styles.checkbox}
-            >
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <Ionicons
-                  name={
-                    selectMode
-                      ? isSelected
-                        ? "checkbox"
-                        : "square-outline"
-                      : item.completed
-                        ? "checkbox"
-                        : "square-outline"
-                  }
-                  size={24}
-                  color={
-                    selectMode
-                      ? isSelected
-                        ? colors.tint
-                        : colors.icon
-                      : item.completed
-                        ? "#22c55e"
-                        : colors.icon
-                  }
-                />
-              </Animated.View>
-            </TouchableOpacity>
+            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+              <Ionicons
+                name={
+                  selectMode
+                    ? isSelected
+                      ? "checkbox"
+                      : "square-outline"
+                    : item.completed
+                      ? "checkbox"
+                      : "square-outline"
+                }
+                size={24}
+                color={
+                  selectMode
+                    ? isSelected
+                      ? colors.tint
+                      : colors.icon
+                    : item.completed
+                      ? "#22c55e"
+                      : colors.icon
+                }
+              />
+            </Animated.View>
+          </TouchableOpacity>
 
-            {isEditing ? (
-              <TextInput
+          {isEditing ? (
+            <TextInput
+              style={[
+                styles.taskTitle,
+                styles.editInput,
+                { color: colors.text, borderColor: colors.tint },
+              ]}
+              value={editingText}
+              onChangeText={setEditingText}
+              onSubmitEditing={saveEdit}
+              onBlur={saveEdit}
+              autoFocus
+              returnKeyType="done"
+              selectTextOnFocus
+            />
+          ) : (
+            <TouchableOpacity
+              style={styles.taskTitleTouchable}
+              disabled={selectMode}
+              onPress={() => startEditing(item)}
+              onLongPress={selectMode ? undefined : drag}
+            >
+              <Text
                 style={[
                   styles.taskTitle,
-                  styles.editInput,
-                  { color: colors.text, borderColor: colors.tint },
-                ]}
-                value={editingText}
-                onChangeText={setEditingText}
-                onSubmitEditing={saveEdit}
-                onBlur={saveEdit}
-                autoFocus
-                returnKeyType="done"
-                selectTextOnFocus
-              />
-            ) : (
-              <TouchableOpacity
-                style={styles.taskTitleTouchable}
-                disabled={selectMode}
-                onPress={() => startEditing(item)}
-                onLongPress={selectMode ? undefined : drag}
-              >
-                <Text
-                  style={[
-                    styles.taskTitle,
-                    { color: colors.text },
-                    item.completed && styles.taskCompleted,
-                  ]}
-                >
-                  {item.title}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {!selectMode && !isEditing && (
-              <View style={styles.rightActions}>
-                <TouchableOpacity
-                  onPress={() => toggleReminderPicker(item)}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons
-                    name={
-                      item.reminder_time
-                        ? "notifications"
-                        : "notifications-outline"
-                    }
-                    size={18}
-                    color={item.reminder_time ? colors.tint : colors.icon}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => deleteTask(item.id)}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#ef4444" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onLongPress={drag}
-                  delayLongPress={0}
-                  style={{ padding: 4 }}
-                >
-                  <Ionicons name="menu-outline" size={20} color={colors.icon} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </AnimatedTouchableOpacity>
-
-          {isPickerOpen && (
-            <View
-              style={[
-                styles.reminderPicker,
-                {
-                  borderTopColor: scheme === "dark" ? "#2a2c2e" : "#eee",
-                  backgroundColor: scheme === "dark" ? "#1a1c1e" : "#fafafa",
-                },
-              ]}
-            >
-              <View style={styles.timePickerCol}>
-                <TouchableOpacity
-                  onPress={() => setPickerHour((h) => (h + 1) % 24)}
-                  style={styles.timeArrow}
-                >
-                  <Ionicons name="chevron-up" size={18} color={colors.tint} />
-                </TouchableOpacity>
-                <Text style={[styles.timeValue, { color: colors.text }]}>
-                  {String(pickerHour).padStart(2, "0")}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setPickerHour((h) => (h - 1 + 24) % 24)}
-                  style={styles.timeArrow}
-                >
-                  <Ionicons name="chevron-down" size={18} color={colors.tint} />
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.timeSep, { color: colors.text }]}>:</Text>
-              <View style={styles.timePickerCol}>
-                <TouchableOpacity
-                  onPress={() => setPickerMinute((m) => (m + 5) % 60)}
-                  style={styles.timeArrow}
-                >
-                  <Ionicons name="chevron-up" size={18} color={colors.tint} />
-                </TouchableOpacity>
-                <Text style={[styles.timeValue, { color: colors.text }]}>
-                  {String(pickerMinute).padStart(2, "0")}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setPickerMinute((m) => (m - 5 + 60) % 60)}
-                  style={styles.timeArrow}
-                >
-                  <Ionicons name="chevron-down" size={18} color={colors.tint} />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                onPress={() => commitReminder(item)}
-                style={[
-                  styles.reminderSetButton,
-                  { backgroundColor: colors.tint },
+                  { color: colors.text },
+                  item.completed && styles.taskCompleted,
                 ]}
               >
-                <Text
-                  style={{
-                    color: scheme === "dark" ? "#151718" : "#fff",
-                    fontWeight: "700",
-                    fontSize: 13,
-                  }}
-                >
-                  Set
-                </Text>
+                {item.title}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {!selectMode && !isEditing && (
+            <View style={styles.rightActions}>
+              <TouchableOpacity
+                onPress={() => setReminderTask(item)}
+                style={{ padding: 4 }}
+              >
+                <Ionicons
+                  name={
+                    item.reminder_time
+                      ? "notifications"
+                      : "notifications-outline"
+                  }
+                  size={18}
+                  color={item.reminder_time ? colors.tint : colors.icon}
+                />
               </TouchableOpacity>
-              {item.reminder_time && (
-                <TouchableOpacity
-                  onPress={() => removeReminder(item)}
-                  style={styles.reminderRemoveButton}
-                >
-                  <Ionicons name="close-circle" size={22} color="#ef4444" />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                onPress={() => deleteTask(item.id)}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#ef4444" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onLongPress={drag}
+                delayLongPress={0}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="menu-outline" size={20} color={colors.icon} />
+              </TouchableOpacity>
             </View>
           )}
-        </View>
+        </AnimatedTouchableOpacity>
       </ScaleDecorator>
     );
   };
@@ -617,6 +519,17 @@ export default function TasksScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      <ReminderDrawer
+        visible={reminderTask !== null}
+        onClose={() => setReminderTask(null)}
+        itemTitle={reminderTask?.title ?? ""}
+        itemType="task"
+        currentTime={reminderTask?.reminder_time}
+        currentDate={reminderTask?.reminder_date}
+        onSave={handleSaveReminder}
+        onRemove={handleRemoveReminder}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -654,11 +567,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   selectAllText: { fontSize: 15, fontWeight: "500" },
-  taskWrapper: { borderBottomWidth: 1 },
   taskRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
+    borderBottomWidth: 1,
     gap: 12,
   },
   checkbox: { padding: 2 },
@@ -709,28 +622,4 @@ const styles = StyleSheet.create({
   },
   bulkButtonText: { fontSize: 15, fontWeight: "600" },
   rightActions: { flexDirection: "row", alignItems: "center", gap: 4 },
-  reminderPicker: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-  },
-  timePickerCol: { alignItems: "center", gap: 2 },
-  timeArrow: { padding: 2 },
-  timeValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    minWidth: 30,
-    textAlign: "center",
-  },
-  timeSep: { fontSize: 18, fontWeight: "700" },
-  reminderSetButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  reminderRemoveButton: { padding: 4, marginLeft: 4 },
 });

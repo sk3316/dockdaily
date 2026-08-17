@@ -20,7 +20,7 @@ import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useHabitStore } from "@/store/useHabitStore";
 import { useRescueStore } from "@/store/useRescueStore";
-import { handleSmartNotification } from "@/utils/notifications";
+import { handleSmartNotification, refreshHabitReminders } from "@/utils/notifications";
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
@@ -66,6 +66,11 @@ export default Sentry.wrap(function RootLayout() {
         // Check for broken streaks on cold start
         await useHabitStore.getState().loadAllLogs();
         await useRescueStore.getState().runRescueCheck();
+
+        // Refresh per-item habit reminders — self-corrects future-start-date
+        // reminders into daily-recurring mode once their date arrives
+        await useHabitStore.getState().loadHabits();
+        await refreshHabitReminders(useHabitStore.getState().habits);
       } catch (err) {
         console.error("[Init] Error:", err);
         setDbReady(true); // Still allow app to load even if there's an error
@@ -83,6 +88,10 @@ export default Sentry.wrap(function RootLayout() {
         await useSyncStore.getState().syncAll();
         await useHabitStore.getState().loadAllLogs();
         await useRescueStore.getState().runRescueCheck(); // NEW
+
+        // Refresh per-item habit reminders on every foreground too
+        await useHabitStore.getState().loadHabits();
+        await refreshHabitReminders(useHabitStore.getState().habits);
 
         // Smart notification check
         const { notificationsEnabled, reminderTime } =
