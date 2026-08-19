@@ -1,19 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { format, formatDistanceToNow } from 'date-fns';
-import { useTaskStore } from '@/store/useTaskStore';
-import { useHabitStore } from '@/store/useHabitStore';
-import { useInsightsStore } from '@/store/useInsightsStore';
+import AskHabitsSheet from "@/components/AskHabitsSheet";
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { useHabitStore } from "@/store/useHabitStore";
+import { useInsightsStore } from "@/store/useInsightsStore";
+import { useTaskStore } from "@/store/useTaskStore";
 import {
-  calculateStreak,
   calculateLongestStreak,
+  calculateStreak,
   getLastNDays,
   getLocalDateString,
   parseLocalDateString,
-} from '@/utils/streak';
-import { useAppTheme } from '@/hooks/use-app-theme';
-import AskHabitsSheet from '@/components/AskHabitsSheet';
+} from "@/utils/streak";
+import { Ionicons } from "@expo/vector-icons";
+import { format, formatDistanceToNow } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function StatsScreen() {
   const { tasks, loadTasks } = useTaskStore();
@@ -28,8 +35,14 @@ export default function StatsScreen() {
     loadAllLogs();
   }, [loadTasks, loadHabits, loadAllLogs]);
 
-  const { insight, lastUpdated, loading, error, loadCachedInsight, fetchInsight } =
-    useInsightsStore();
+  const {
+    insight,
+    lastUpdated,
+    loading,
+    error,
+    loadCachedInsight,
+    fetchInsight,
+  } = useInsightsStore();
 
   useEffect(() => {
     loadCachedInsight();
@@ -41,14 +54,22 @@ export default function StatsScreen() {
 
   // Recompute day lists when the calendar date changes (avoids stale data after midnight)
   const todayKey = getLocalDateString();
-  const last7Days = useMemo(() => getLastNDays(7, parseLocalDateString(todayKey)), [todayKey]);
-  const last14Days = useMemo(() => getLastNDays(14, parseLocalDateString(todayKey)), [todayKey]);
+  const last7Days = useMemo(
+    () => getLastNDays(7, parseLocalDateString(todayKey)),
+    [todayKey],
+  );
+  const last14Days = useMemo(
+    () => getLastNDays(14, parseLocalDateString(todayKey)),
+    [todayKey],
+  );
 
   const completedDatesByHabit = useMemo(() => {
     const map: Record<string, Set<string>> = {};
     for (const h of habits) {
       map[h.id] = new Set(
-        allLogs.filter((l) => l.habit_id === h.id && l.completed).map((l) => l.date)
+        allLogs
+          .filter((l) => l.habit_id === h.id && l.completed)
+          .map((l) => l.date),
       );
     }
     return map;
@@ -56,21 +77,34 @@ export default function StatsScreen() {
 
   const weeklyActivity = useMemo(() => {
     return last7Days.map((date) => {
-      const habitsCompleted = allLogs.filter((l) => l.date === date && l.completed).length;
-      const tasksCompleted = tasks.filter(
-        (t) => t.completed && t.completed_at && format(new Date(t.completed_at), 'yyyy-MM-dd') === date
+      const habitsCompleted = allLogs.filter(
+        (l) => l.date === date && l.completed,
       ).length;
-      return { date, habitsCompleted, tasksCompleted, total: habitsCompleted + tasksCompleted };
+      const tasksCompleted = tasks.filter(
+        (t) =>
+          t.completed &&
+          t.completed_at &&
+          format(new Date(t.completed_at), "yyyy-MM-dd") === date,
+      ).length;
+      return {
+        date,
+        habitsCompleted,
+        tasksCompleted,
+        total: habitsCompleted + tasksCompleted,
+      };
     });
   }, [last7Days, allLogs, tasks]);
 
   const maxWeeklyValue = Math.max(1, ...weeklyActivity.map((d) => d.total));
 
-  const tasksCompletedAllTime = useMemo(() => tasks.filter((t) => t.completed).length, [tasks]);
+  const tasksCompletedAllTime = useMemo(
+    () => tasks.filter((t) => t.completed).length,
+    [tasks],
+  );
 
   const longestStreakInfo = useMemo(() => {
     let max = 0;
-    let title = '';
+    let title = "";
     for (const h of habits) {
       const longest = calculateLongestStreak(allLogs, h.id);
       if (longest > max) {
@@ -83,16 +117,21 @@ export default function StatsScreen() {
 
   const activeStreaks = useMemo(
     () => habits.filter((h) => calculateStreak(allLogs, h.id) > 0).length,
-    [habits, allLogs]
+    [habits, allLogs],
   );
 
-  const weekHabitCompletions = weeklyActivity.reduce((sum, d) => sum + d.habitsCompleted, 0);
+  const weekHabitCompletions = weeklyActivity.reduce(
+    (sum, d) => sum + d.habitsCompleted,
+    0,
+  );
   const weekHabitPossible = habits.length * 7;
   const weekCompletionRate =
-    weekHabitPossible > 0 ? Math.round((weekHabitCompletions / weekHabitPossible) * 100) : 0;
+    weekHabitPossible > 0
+      ? Math.round((weekHabitCompletions / weekHabitPossible) * 100)
+      : 0;
 
-  const cardBg = scheme === 'dark' ? '#1f2123' : '#f2f2f2';
-  const borderColor = scheme === 'dark' ? '#2a2c2e' : '#eee';
+  const cardBg = scheme === "dark" ? "#1f2123" : "#f2f2f2";
+  const borderColor = scheme === "dark" ? "#2a2c2e" : "#eee";
 
   const [chatVisible, setChatVisible] = useState(false);
 
@@ -105,8 +144,17 @@ export default function StatsScreen() {
             onPress={() => setChatVisible(true)}
             style={[styles.askButton, { backgroundColor: colors.tint }]}
           >
-            <Ionicons name="chatbubble-ellipses" size={16} color={scheme === 'dark' ? '#151718' : '#fff'} />
-            <Text style={[styles.askButtonText, { color: scheme === 'dark' ? '#151718' : '#fff' }]}>
+            <Ionicons
+              name="chatbubble-ellipses"
+              size={16}
+              color={scheme === "dark" ? "#151718" : "#fff"}
+            />
+            <Text
+              style={[
+                styles.askButtonText,
+                { color: scheme === "dark" ? "#151718" : "#fff" },
+              ]}
+            >
               Ask AI
             </Text>
           </TouchableOpacity>
@@ -129,11 +177,18 @@ export default function StatsScreen() {
             <View style={[styles.statCard, { backgroundColor: cardBg }]}>
               <View style={styles.statCardHeader}>
                 <Ionicons name="flame" size={16} color="#f97316" />
-                <Text style={[styles.statLabel, { color: colors.icon }]}>Longest Streak</Text>
+                <Text style={[styles.statLabel, { color: colors.icon }]}>
+                  Longest Streak
+                </Text>
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>{longestStreakInfo.max}</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {longestStreakInfo.max}
+              </Text>
               {longestStreakInfo.title ? (
-                <Text style={[styles.statSubtext, { color: colors.icon }]} numberOfLines={1}>
+                <Text
+                  style={[styles.statSubtext, { color: colors.icon }]}
+                  numberOfLines={1}
+                >
                   {longestStreakInfo.title}
                 </Text>
               ) : null}
@@ -142,40 +197,66 @@ export default function StatsScreen() {
             <View style={[styles.statCard, { backgroundColor: cardBg }]}>
               <View style={styles.statCardHeader}>
                 <Ionicons name="checkmark-done" size={16} color={colors.tint} />
-                <Text style={[styles.statLabel, { color: colors.icon }]}>Tasks Done</Text>
+                <Text style={[styles.statLabel, { color: colors.icon }]}>
+                  Tasks Done
+                </Text>
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>{tasksCompletedAllTime}</Text>
-              <Text style={[styles.statSubtext, { color: colors.icon }]}>all time</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {tasksCompletedAllTime}
+              </Text>
+              <Text style={[styles.statSubtext, { color: colors.icon }]}>
+                all time
+              </Text>
             </View>
 
             <View style={[styles.statCard, { backgroundColor: cardBg }]}>
               <View style={styles.statCardHeader}>
                 <Ionicons name="trending-up" size={16} color={colors.tint} />
-                <Text style={[styles.statLabel, { color: colors.icon }]}>Active Streaks</Text>
+                <Text style={[styles.statLabel, { color: colors.icon }]}>
+                  Active Streaks
+                </Text>
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>
                 {activeStreaks}/{habits.length}
               </Text>
-              <Text style={[styles.statSubtext, { color: colors.icon }]}>habits going</Text>
+              <Text style={[styles.statSubtext, { color: colors.icon }]}>
+                habits going
+              </Text>
             </View>
 
             <View style={[styles.statCard, { backgroundColor: cardBg }]}>
               <View style={styles.statCardHeader}>
                 <Ionicons name="calendar" size={16} color={colors.tint} />
-                <Text style={[styles.statLabel, { color: colors.icon }]}>This Week</Text>
+                <Text style={[styles.statLabel, { color: colors.icon }]}>
+                  This Week
+                </Text>
               </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>{weekCompletionRate}%</Text>
-              <Text style={[styles.statSubtext, { color: colors.icon }]}>habit check-ins</Text>
+              <Text style={[styles.statValue, { color: colors.text }]}>
+                {weekCompletionRate}%
+              </Text>
+              <Text style={[styles.statSubtext, { color: colors.icon }]}>
+                habit check-ins
+              </Text>
             </View>
           </View>
 
-          <View style={[styles.insightCard, { backgroundColor: cardBg, borderColor: colors.tint }]}>
+          <View
+            style={[
+              styles.insightCard,
+              { backgroundColor: cardBg, borderColor: colors.tint },
+            ]}
+          >
             <View style={styles.insightHeader}>
               <View style={styles.insightHeaderLeft}>
                 <Ionicons name="sparkles" size={18} color={colors.tint} />
-                <Text style={[styles.insightTitle, { color: colors.text }]}>Weekly Insight</Text>
+                <Text style={[styles.insightTitle, { color: colors.text }]}>
+                  Weekly Insight
+                </Text>
               </View>
-              <TouchableOpacity onPress={handleRefreshInsight} disabled={loading}>
+              <TouchableOpacity
+                onPress={handleRefreshInsight}
+                disabled={loading}
+              >
                 <Ionicons
                   name="refresh"
                   size={18}
@@ -187,7 +268,9 @@ export default function StatsScreen() {
             {loading ? (
               <View style={styles.insightLoading}>
                 <ActivityIndicator size="small" color={colors.tint} />
-                <Text style={[styles.insightLoadingText, { color: colors.icon }]}>
+                <Text
+                  style={[styles.insightLoadingText, { color: colors.icon }]}
+                >
                   Analyzing your patterns...
                 </Text>
               </View>
@@ -197,15 +280,25 @@ export default function StatsScreen() {
               </Text>
             ) : insight ? (
               <>
-                <Text style={[styles.insightText, { color: colors.text }]}>{insight}</Text>
+                <Text style={[styles.insightText, { color: colors.text }]}>
+                  {insight}
+                </Text>
                 {lastUpdated && (
-                  <Text style={[styles.insightTimestamp, { color: colors.icon }]}>
-                    Updated {formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })}
+                  <Text
+                    style={[styles.insightTimestamp, { color: colors.icon }]}
+                  >
+                    Updated{" "}
+                    {formatDistanceToNow(new Date(lastUpdated), {
+                      addSuffix: true,
+                    })}
                   </Text>
                 )}
               </>
             ) : (
-              <TouchableOpacity onPress={handleRefreshInsight} style={styles.insightEmptyButton}>
+              <TouchableOpacity
+                onPress={handleRefreshInsight}
+                style={styles.insightEmptyButton}
+              >
                 <Text style={[styles.insightEmptyText, { color: colors.tint }]}>
                   Tap to generate your first insight
                 </Text>
@@ -213,13 +306,21 @@ export default function StatsScreen() {
             )}
           </View>
 
-          <Text style={[styles.sectionHeader, { color: colors.text, marginTop: 28 }]}>
+          <Text
+            style={[
+              styles.sectionHeader,
+              { color: colors.text, marginTop: 28 },
+            ]}
+          >
             Weekly Activity
           </Text>
           <View style={[styles.chartCard, { backgroundColor: cardBg }]}>
             <View style={styles.barsRow}>
               {weeklyActivity.map((day) => {
-                const heightPct = day.total > 0 ? Math.max(8, (day.total / maxWeeklyValue) * 100) : 4;
+                const heightPct =
+                  day.total > 0
+                    ? Math.max(8, (day.total / maxWeeklyValue) * 100)
+                    : 4;
                 const isToday = day.date === last7Days[last7Days.length - 1];
                 return (
                   <View key={day.date} style={styles.barColumn}>
@@ -229,23 +330,32 @@ export default function StatsScreen() {
                           styles.bar,
                           {
                             height: `${heightPct}%`,
-                            backgroundColor: isToday ? colors.tint : colors.icon,
+                            backgroundColor: isToday
+                              ? colors.tint
+                              : colors.icon,
                             opacity: isToday ? 1 : 0.55,
                           },
                         ]}
                       />
                     </View>
                     <Text style={[styles.barLabel, { color: colors.icon }]}>
-                      {format(parseLocalDateString(day.date), 'EEEEE')}
+                      {format(parseLocalDateString(day.date), "EEEEE")}
                     </Text>
-                    <Text style={[styles.barValue, { color: colors.text }]}>{day.total}</Text>
+                    <Text style={[styles.barValue, { color: colors.text }]}>
+                      {day.total}
+                    </Text>
                   </View>
                 );
               })}
             </View>
           </View>
 
-          <Text style={[styles.sectionHeader, { color: colors.text, marginTop: 28 }]}>
+          <Text
+            style={[
+              styles.sectionHeader,
+              { color: colors.text, marginTop: 28 },
+            ]}
+          >
             Habit Consistency
           </Text>
 
@@ -257,15 +367,32 @@ export default function StatsScreen() {
             habits.map((habit) => {
               const streak = calculateStreak(allLogs, habit.id);
               const longest = calculateLongestStreak(allLogs, habit.id);
-              const completedDates = completedDatesByHabit[habit.id] ?? new Set<string>();
+              const completedDates =
+                completedDatesByHabit[habit.id] ?? new Set<string>();
 
               return (
-                <View key={habit.id} style={[styles.habitCard, { borderBottomColor: borderColor }]}>
+                <View
+                  key={habit.id}
+                  style={[styles.habitCard, { borderBottomColor: borderColor }]}
+                >
                   <View style={styles.habitCardHeader}>
-                    <Text style={[styles.habitCardTitle, { color: colors.text }]}>{habit.title}</Text>
+                    <Text
+                      style={[styles.habitCardTitle, { color: colors.text }]}
+                    >
+                      {habit.title}
+                    </Text>
                     <View style={styles.habitCardStreaks}>
-                      <Ionicons name="flame" size={13} color={streak > 0 ? '#f97316' : colors.icon} />
-                      <Text style={[styles.habitCardStreakText, { color: colors.icon }]}>
+                      <Ionicons
+                        name="flame"
+                        size={13}
+                        color={streak > 0 ? "#f97316" : colors.icon}
+                      />
+                      <Text
+                        style={[
+                          styles.habitCardStreakText,
+                          { color: colors.icon },
+                        ]}
+                      >
                         {streak} now · {longest} best
                       </Text>
                     </View>
@@ -279,9 +406,9 @@ export default function StatsScreen() {
                           {
                             backgroundColor: completedDates.has(date)
                               ? colors.tint
-                              : scheme === 'dark'
-                              ? '#2a2c2e'
-                              : '#e5e5e5',
+                              : scheme === "dark"
+                                ? "#2a2c2e"
+                                : "#e5e5e5",
                           },
                         ]}
                       />
@@ -293,7 +420,10 @@ export default function StatsScreen() {
           )}
         </ScrollView>
       )}
-      <AskHabitsSheet visible={chatVisible} onClose={() => setChatVisible(false)} />
+      <AskHabitsSheet
+        visible={chatVisible}
+        onClose={() => setChatVisible(false)}
+      />
     </View>
   );
 }
@@ -306,49 +436,74 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
   },
-  header: { fontSize: 28, fontWeight: '700' },
+  header: { fontSize: 28, fontWeight: "700" },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   askButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
   },
-  askButtonText: { fontSize: 13, fontWeight: '700' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  askButtonText: { fontSize: 13, fontWeight: "700" },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
   scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
-  emptyText: { fontSize: 14, textAlign: 'center', marginTop: 8 },
-  cardsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statCard: { width: '47%', borderRadius: 14, padding: 14 },
-  statCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  statLabel: { fontSize: 12, fontWeight: '600' },
-  statValue: { fontSize: 24, fontWeight: '700' },
+  emptyText: { fontSize: 14, textAlign: "center", marginTop: 8 },
+  cardsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 10,
+  },
+  statCard: { width: "48%", borderRadius: 14, padding: 14 },
+  statCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  statLabel: { fontSize: 12, fontWeight: "600" },
+  statValue: { fontSize: 24, fontWeight: "700" },
   statSubtext: { fontSize: 12, marginTop: 2 },
-  sectionHeader: { fontSize: 20, fontWeight: '700', marginBottom: 10 },
+  sectionHeader: { fontSize: 20, fontWeight: "700", marginBottom: 10 },
   chartCard: { borderRadius: 14, padding: 16 },
-  barsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 130 },
-  barColumn: { alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end' },
-  barTrack: { height: 90, width: 20, justifyContent: 'flex-end' },
-  bar: { width: '100%', borderRadius: 6, minHeight: 4 },
-  barLabel: { fontSize: 11, fontWeight: '600', marginTop: 6 },
-  barValue: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+  barsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    height: 130,
+  },
+  barColumn: {
+    alignItems: "center",
+    flex: 1,
+    height: "100%",
+    justifyContent: "flex-end",
+  },
+  barTrack: { height: 90, width: 20, justifyContent: "flex-end" },
+  bar: { width: "100%", borderRadius: 6, minHeight: 4 },
+  barLabel: { fontSize: 11, fontWeight: "600", marginTop: 6 },
+  barValue: { fontSize: 11, fontWeight: "700", marginTop: 2 },
   habitCard: { paddingVertical: 14, borderBottomWidth: 1 },
   habitCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
-  habitCardTitle: { fontSize: 15, fontWeight: '600', flex: 1 },
-  habitCardStreaks: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  habitCardStreakText: { fontSize: 12, fontWeight: '500' },
-  dotsRow: { flexDirection: 'row', gap: 4 },
+  habitCardTitle: { fontSize: 15, fontWeight: "600", flex: 1 },
+  habitCardStreaks: { flexDirection: "row", alignItems: "center", gap: 4 },
+  habitCardStreakText: { fontSize: 12, fontWeight: "500" },
+  dotsRow: { flexDirection: "row", gap: 4 },
   dot: { width: 18, height: 18, borderRadius: 4 },
   insightCard: {
     borderRadius: 14,
@@ -357,18 +512,23 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   insightHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 10,
   },
-  insightHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  insightTitle: { fontSize: 15, fontWeight: '700' },
+  insightHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  insightTitle: { fontSize: 15, fontWeight: "700" },
   insightText: { fontSize: 14, lineHeight: 21 },
   insightTimestamp: { fontSize: 11, marginTop: 8 },
-  insightLoading: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  insightLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 4,
+  },
   insightLoadingText: { fontSize: 13 },
-  insightError: { fontSize: 13, fontStyle: 'italic' },
+  insightError: { fontSize: 13, fontStyle: "italic" },
   insightEmptyButton: { paddingVertical: 8 },
-  insightEmptyText: { fontSize: 14, fontWeight: '600' },
+  insightEmptyText: { fontSize: 14, fontWeight: "600" },
 });
