@@ -109,6 +109,7 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
       habitId,
       date
     );
+    const wasCompleted = existing ? !!existing.completed : false;
     const completed = value >= target ? 1 : 0;
 
     if (existing) {
@@ -142,6 +143,14 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     await get().loadHabits();
 
     scheduleSync();
+
+    // Newly completed today — check for a linked active challenge
+    if (!wasCompleted && completed === 1) {
+      const { syncHabitToChallenge } = await import('./challengeSync');
+      syncHabitToChallenge(habitId).catch((err) =>
+        console.error('[Habit] challenge sync error:', err)
+      );
+    }
   },
 
   deleteHabit: async (id) => {

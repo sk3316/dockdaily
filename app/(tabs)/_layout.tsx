@@ -34,6 +34,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="challenges"
+        options={{
+          title: "Challenges",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trophy-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="stats"
         options={{
           title: "Stats",

@@ -1,0 +1,26 @@
+{
+  "nodes": [],
+  "edges": [],
+  "hyperedges": [],
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "failed_chunks": 1,
+  "out_of_scope_dropped": 0,
+  "uncovered_files": [
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\.github\\skills\\expo-rn-feature\\SKILL.md",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\AGENTS.md",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\android-icon-background.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\android-icon-foreground.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\android-icon-monochrome.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\favicon.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\icon.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\partial-react-logo.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\react-logo.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\react-logo@2x.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\react-logo@3x.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\assets\\images\\splash-icon.png",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\CLAUDE.md",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\description.md",
+    "D:\\Users\\K M Nehru\\Desktop\\github repos\\DockDaily\\dockdaily\\README.md"
+  ]
+}

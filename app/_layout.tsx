@@ -20,7 +20,8 @@ import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useHabitStore } from "@/store/useHabitStore";
 import { useRescueStore } from "@/store/useRescueStore";
-import { handleSmartNotification, refreshHabitReminders } from "@/utils/notifications";
+import { handleSmartNotification, refreshHabitReminders, registerPushToken } from "@/utils/notifications";
+import { supabase } from "@/lib/supabase";
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
@@ -62,6 +63,19 @@ export default Sentry.wrap(function RootLayout() {
         await usePreferenceStore.getState().loadPreferences();
         await useAuthStore.getState().loadSession();
         setDbReady(true);
+
+        // Register the device's Expo push token and persist it on the user's
+        // profile row so the server can target them with notifications.
+        const session = useAuthStore.getState().session;
+        if (session) {
+          const token = await registerPushToken();
+          if (token) {
+            await supabase
+              .from("profiles")
+              .update({ push_token: token })
+              .eq("id", session.user.id);
+          }
+        }
 
         // Check for broken streaks on cold start
         await useHabitStore.getState().loadAllLogs();
@@ -174,6 +188,12 @@ export default Sentry.wrap(function RootLayout() {
           />
           <Stack.Screen name="google-auth" options={{ headerShown: false }} />
           <Stack.Screen name="about" options={{ headerShown: false }} />
+          <Stack.Screen name="friends" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="create-challenge"
+            options={{ presentation: "modal", headerShown: false }}
+          />
+          <Stack.Screen name="challenge/[id]" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

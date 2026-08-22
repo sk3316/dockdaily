@@ -20,6 +20,20 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   return status === "granted";
 }
 
+export async function registerPushToken(): Promise<string | null> {
+  const granted = await requestNotificationPermissions();
+  if (!granted) return null;
+
+  try {
+    const projectId = 'c9a82720-1133-49c7-97ea-d9ab5fed5108'; // your EAS projectId
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    return tokenData.data;
+  } catch (err) {
+    console.error('[Notifications] Failed to get push token:', err);
+    return null;
+  }
+}
+
 export async function scheduleDailyReminder(
   reminderTime: string,
 ): Promise<void> {
