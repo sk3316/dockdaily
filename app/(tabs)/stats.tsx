@@ -276,7 +276,7 @@ export default function StatsScreen() {
               </View>
             ) : error ? (
               <Text style={[styles.insightError, { color: colors.icon }]}>
-                Couldn't load insight — tap refresh to try again
+                {"Couldn't load insight — tap refresh to try again"}
               </Text>
             ) : insight ? (
               <>

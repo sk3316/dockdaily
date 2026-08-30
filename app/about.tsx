@@ -118,8 +118,7 @@ export default function AboutScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.intro, { color: colors.icon }]}>
-          We believe you should know exactly what happens with your data. Here's
-          everything, plainly explained.
+          {"We believe you should know exactly what happens with your data. Here's everything, plainly explained."}
         </Text>
 
         {SECTIONS.map((section, i) => (

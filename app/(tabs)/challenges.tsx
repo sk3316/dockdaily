@@ -3,6 +3,7 @@ import { useAppTheme } from "@/hooks/use-app-theme";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHabitStore } from "@/store/useHabitStore";
+import { useFriendsStore } from "@/store/useFriendsStore";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { router } from "expo-router";
@@ -26,11 +27,11 @@ export default function ChallengesScreen() {
     challenges,
     loading,
     loadChallenges,
-    acceptChallenge,
     declineChallenge,
   } = useChallengeStore();
   const { user } = useAuthStore();
   const { habits } = useHabitStore();
+  const { loadFriends } = useFriendsStore();
   const [acceptingChallenge, setAcceptingChallenge] = useState<{
     id: string;
     title: string;
@@ -38,7 +39,8 @@ export default function ChallengesScreen() {
 
   useEffect(() => {
     loadChallenges();
-  }, [loadChallenges]);
+    loadFriends();
+  }, [loadChallenges, loadFriends]);
 
   const myUserId = user?.id;
 

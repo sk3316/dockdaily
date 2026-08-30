@@ -286,7 +286,7 @@ export default function ChallengeDetailScreen() {
         {timelineLoading ? (
           <ActivityIndicator color={colors.tint} style={{ marginTop: 10 }} />
         ) : timeline.length === 0 ? (
-          <Text style={[styles.subtext, { color: colors.icon, paddingHorizontal: 0 }]}>
+          <Text style={[styles.metaText, { color: colors.icon, paddingHorizontal: 0 }]}>
             No check-ins yet.
           </Text>
         ) : (

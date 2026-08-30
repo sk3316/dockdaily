@@ -6,7 +6,7 @@ import {
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState, useRef } from "react";
-import { View, ActivityIndicator, AppState, Text } from "react-native";
+import { View, ActivityIndicator, AppState } from "react-native";
 
 import "react-native-reanimated";
 import * as WebBrowser from "expo-web-browser";

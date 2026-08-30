@@ -536,11 +536,6 @@ export default function ProfileScreen() {
             <Text style={[styles.menuLabel, { color: colors.text }]}>
               Friends
             </Text>
-            <View style={[styles.comingSoonBadge, { borderColor }]}>
-              <Text style={[styles.comingSoonText, { color: colors.icon }]}>
-                Coming soon
-              </Text>
-            </View>
             <Ionicons name="chevron-forward" size={16} color={colors.icon} />
           </TouchableOpacity>
 
@@ -731,13 +726,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   divider: { height: 1, marginHorizontal: 16 },
-  comingSoonBadge: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  comingSoonText: { fontSize: 11, fontWeight: "600" },
   version: { textAlign: "center", fontSize: 12 },
   sectionTitle: {
     fontSize: 13,

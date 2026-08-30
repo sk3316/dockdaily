@@ -124,13 +124,13 @@ export default function BugReportSheet({ visible, onClose }: Props) {
               Thanks for the feedback!
             </Text>
             <Text style={[styles.successSubtitle, { color: colors.icon }]}>
-              We'll look into it.
+              {"We'll look into it."}
             </Text>
           </View>
         ) : (
           <View style={styles.content}>
             <Text style={[styles.label, { color: colors.text }]}>
-              What's this about?
+              {"What's this about?"}
             </Text>
             <View style={styles.categoryRow}>
               {CATEGORIES.map((c) => (

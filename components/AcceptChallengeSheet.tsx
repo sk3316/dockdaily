@@ -105,7 +105,7 @@ export default function AcceptChallengeSheet({
           </TouchableOpacity>
         </View>
         <Text style={[styles.subtext, { color: colors.icon }]}>
-          Which of your habits matches "{challengeTitle}"?
+          {`Which of your habits matches "${challengeTitle}"?`}
         </Text>
 
         {matching && (

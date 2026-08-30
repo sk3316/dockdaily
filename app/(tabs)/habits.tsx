@@ -1,4 +1,5 @@
 import AISuggestionSheet from "@/components/AISuggestionSheet";
+import HabitHistorySheet from "@/components/HabitHistorySheet";
 import ReminderDrawer from "@/components/ReminderDrawer";
 import { useAnimatedProgress } from "@/hooks/use-animated-progress";
 import { useAppTheme } from "@/hooks/use-app-theme";
@@ -69,6 +70,7 @@ export default function HabitsScreen() {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitleText, setEditingTitleText] = useState("");
   const [reminderHabit, setReminderHabit] = useState<Habit | null>(null);
+  const [historyVisible, setHistoryVisible] = useState(false);
   const { scheme, colors } = useAppTheme();
   const { getFlashAnim, getScaleAnim, celebrate } = useCelebration();
   const { fetchSuggestions } = useAIStore();
@@ -177,11 +179,6 @@ export default function HabitsScreen() {
 
   const saveTitleEdit = async (habit: Habit) => {
     await updateHabitTitle(habit.id, editingTitleText);
-    setEditingTitleId(null);
-    setEditingTitleText("");
-  };
-
-  const cancelTitleEdit = () => {
     setEditingTitleId(null);
     setEditingTitleText("");
   };
@@ -390,7 +387,25 @@ export default function HabitsScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <View style={styles.container}>
-        <Text style={[styles.header, { color: colors.text }]}>Habits</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.header, { color: colors.text }]}>Habits</Text>
+          <TouchableOpacity
+            onPress={() => setHistoryVisible(true)}
+            style={[
+              styles.historyButton,
+              {
+                backgroundColor: scheme === "dark" ? "#1f2123" : "#f2f2f2",
+                borderColor: scheme === "dark" ? "#2a2c2e" : "#eee",
+              },
+            ]}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar-outline" size={16} color={colors.text} />
+            <Text style={[styles.historyButtonText, { color: colors.text }]}>
+              21-Day History
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {totalCount > 0 && (
           <View style={styles.progressSection}>
@@ -538,6 +553,11 @@ export default function HabitsScreen() {
 
       <AISuggestionSheet />
 
+      <HabitHistorySheet
+        visible={historyVisible}
+        onClose={() => setHistoryVisible(false)}
+      />
+
       <ReminderDrawer
         visible={reminderHabit !== null}
         onClose={() => setReminderHabit(null)}
@@ -555,7 +575,26 @@ export default function HabitsScreen() {
 const styles = StyleSheet.create({
   flexFill: { flex: 1 },
   container: { flex: 1, paddingTop: 60, paddingHorizontal: 16 },
-  header: { fontSize: 28, fontWeight: "700", marginBottom: 16 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  header: { fontSize: 28, fontWeight: "700" },
+  historyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  historyButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
   progressSection: { marginBottom: 12 },
   progressTrack: { marginBottom: 6 },
   progressTrackBg: { height: 6, borderRadius: 3, overflow: "hidden" },

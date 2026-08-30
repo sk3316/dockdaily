@@ -26,6 +26,12 @@ type HabitStore = {
   addHabit: (title: string, type?: Habit['type'], target?: number) => Promise<void>;
   updateHabitTitle: (id: string, title: string) => Promise<void>;
   logHabit: (habitId: string, value: number, target: number) => Promise<void>;
+  logHabitForDate: (
+    habitId: string,
+    date: string,
+    value: number,
+    target: number
+  ) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
   reorderHabits: (orderedIds: string[]) => Promise<void>;
   setHabitReminder: (id: string, time: string | null, date?: string | null) => Promise<void>;
@@ -102,8 +108,11 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
   },
 
   logHabit: async (habitId, value, target) => {
+    return get().logHabitForDate(habitId, todayStr(), value, target);
+  },
+
+  logHabitForDate: async (habitId, date, value, target) => {
     const database = await getDatabase();
-    const date = todayStr();
     const existing = await database.getFirstAsync<any>(
       'SELECT * FROM habit_logs WHERE habit_id = ? AND date = ?',
       habitId,
@@ -130,7 +139,10 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
         completed
       );
     }
-    await get().loadTodayLogs();
+
+    if (date === todayStr()) {
+      await get().loadTodayLogs();
+    }
     await get().loadAllLogs();
 
     // Update last_known_streak after logging (keeps rescue detection accurate)
@@ -145,11 +157,19 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     scheduleSync();
 
     // Newly completed today — check for a linked active challenge
-    if (!wasCompleted && completed === 1) {
+    if (date === todayStr() && !wasCompleted && completed === 1) {
       const { syncHabitToChallenge } = await import('./challengeSync');
       syncHabitToChallenge(habitId).catch((err) =>
         console.error('[Habit] challenge sync error:', err)
       );
+    }
+
+    // If completed a past day (e.g. yesterday), dismiss any active rescue card
+    if (date !== todayStr() && completed === 1) {
+      try {
+        const { useRescueStore } = await import('./useRescueStore');
+        useRescueStore.getState().dismiss(habitId);
+      } catch (_) {}
     }
   },
 
