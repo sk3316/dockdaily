@@ -559,6 +559,7 @@ export default function HabitsScreen() {
       />
 
       <ReminderDrawer
+        key={reminderHabit?.id ?? "none"}
         visible={reminderHabit !== null}
         onClose={() => setReminderHabit(null)}
         itemTitle={reminderHabit?.title ?? ""}

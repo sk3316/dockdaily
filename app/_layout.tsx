@@ -20,7 +20,7 @@ import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useHabitStore } from "@/store/useHabitStore";
 import { useRescueStore } from "@/store/useRescueStore";
-import { handleSmartNotification, refreshHabitReminders, registerPushToken } from "@/utils/notifications";
+import { handleSmartNotification, refreshHabitReminders, refreshTaskReminders, registerPushToken } from "@/utils/notifications";
 import { supabase } from "@/lib/supabase";
 import * as Sentry from '@sentry/react-native';
 
@@ -81,10 +81,11 @@ export default Sentry.wrap(function RootLayout() {
         await useHabitStore.getState().loadAllLogs();
         await useRescueStore.getState().runRescueCheck();
 
-        // Refresh per-item habit reminders — self-corrects future-start-date
-        // reminders into daily-recurring mode once their date arrives
+        // Refresh per-item habit and task reminders
         await useHabitStore.getState().loadHabits();
         await refreshHabitReminders(useHabitStore.getState().habits);
+        await useTaskStore.getState().loadTasks();
+        await refreshTaskReminders(useTaskStore.getState().tasks);
       } catch (err) {
         console.error("[Init] Error:", err);
         setDbReady(true); // Still allow app to load even if there's an error
@@ -103,9 +104,11 @@ export default Sentry.wrap(function RootLayout() {
         await useHabitStore.getState().loadAllLogs();
         await useRescueStore.getState().runRescueCheck(); // NEW
 
-        // Refresh per-item habit reminders on every foreground too
+        // Refresh per-item habit and task reminders on every foreground too
         await useHabitStore.getState().loadHabits();
         await refreshHabitReminders(useHabitStore.getState().habits);
+        await useTaskStore.getState().loadTasks();
+        await refreshTaskReminders(useTaskStore.getState().tasks);
 
         // Smart notification check
         const { notificationsEnabled, reminderTime } =

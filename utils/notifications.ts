@@ -256,6 +256,27 @@ export async function refreshHabitReminders(
   }
 }
 
+export async function refreshTaskReminders(
+  tasks: {
+    id: string;
+    title: string;
+    reminder_time?: string | null;
+    reminder_date?: string | null;
+    completed?: boolean | number;
+  }[],
+): Promise<void> {
+  for (const task of tasks) {
+    if (task.reminder_time && !task.completed) {
+      await scheduleTaskReminder(
+        task.id,
+        task.title,
+        task.reminder_time,
+        task.reminder_date,
+      );
+    }
+  }
+}
+
 // ─────────────────────────────────────────────
 // Habit rescue nudge (immediate, AI-generated)
 // ─────────────────────────────────────────────

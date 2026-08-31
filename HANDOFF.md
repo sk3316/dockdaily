@@ -2,7 +2,7 @@
 
 ```yaml
 schema_version: "1.1.0"
-handoff_created_at: "2026-08-30T17:25:00+05:30"
+handoff_created_at: "2026-08-31T18:18:00+05:30"
 project:
   name: "dockdaily"
   slug: "dockdaily"
@@ -22,6 +22,7 @@ git_state:
   modified_files:
     - "app/(tabs)/challenges.tsx"
     - "app/(tabs)/habits.tsx"
+    - "app/(tabs)/tasks.tsx"
     - "app/(tabs)/stats.tsx"
     - "app/_layout.tsx"
     - "app/about.tsx"
@@ -29,7 +30,9 @@ git_state:
     - "app/profile.tsx"
     - "components/AcceptChallengeSheet.tsx"
     - "components/BugReportSheet.tsx"
+    - "components/ReminderDrawer.tsx"
     - "store/useHabitStore.ts"
+    - "utils/notifications.ts"
   new_untracked_files:
     - "components/HabitHistorySheet.tsx"
     - "HANDOFF.md"
@@ -343,25 +346,29 @@ All Edge Functions reside under the Supabase project endpoint `${EXPO_PUBLIC_SUP
 ## 8. Current Work Status & Uncommitted Changes
 
 ### 8.1 Uncommitted Working Directory State
+- [components/ReminderDrawer.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/components/ReminderDrawer.tsx): Fixed reminder time/date overwrite bug across habits and tasks by synchronizing internal picker state via `useEffect` whenever `visible`, `currentTime`, or `currentDate` changes. Added robust parsing helpers `parseReminderDate` and `parseReminderTime`.
+- [app/(tabs)/habits.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/(tabs)/habits.tsx): Added `key={reminderHabit?.id ?? "none"}` to `ReminderDrawer` for complete component instance isolation. Added `21-Day History` button in header row and wired `HabitHistorySheet` modal. Removed unused `cancelTitleEdit`.
+- [app/(tabs)/tasks.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/(tabs)/tasks.tsx): Added `key={reminderTask?.id ?? "none"}` to `ReminderDrawer` for complete task reminder state isolation.
+- [utils/notifications.ts](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/utils/notifications.ts): Added `refreshTaskReminders()` export for lifecycle synchronization of uncompleted task reminders alongside `refreshHabitReminders()`.
+- [app/_layout.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/_layout.tsx): Registered `refreshTaskReminders()` on app cold start and active foreground transitions. Cleaned up unused `Text` import.
 - [components/HabitHistorySheet.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/components/HabitHistorySheet.tsx) `[NEW]`: 21-day completion matrix modal sheet with 48h grace window (Today & Yesterday editable with haptics, days 3–21 locked).
 - [store/useHabitStore.ts](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/store/useHabitStore.ts): Added `logHabitForDate(habitId, date, value, target)` for retroactive habit logging without creating fake challenge entries; auto-dismisses rescue cards when yesterday is completed.
-- [app/(tabs)/habits.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/(tabs)/habits.tsx): Added `21-Day History` button in header row and wired `HabitHistorySheet` modal. Removed unused `cancelTitleEdit`.
 - [app/(tabs)/challenges.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/(tabs)/challenges.tsx): Added `loadFriends()` into screen mount `useEffect` so that friend avatars and names resolve immediately on challenges; removed unused `acceptChallenge` import.
 - [app/challenge/[id].tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/challenge/[id].tsx): Fixed empty timeline state style to use `styles.metaText`.
 - [app/profile.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/profile.tsx): Removed "Coming soon" badge from the Friends menu item now that social & friends management is active.
-- [app/_layout.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/_layout.tsx): Cleaned up unused `Text` import.
 - [app/(tabs)/stats.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/(tabs)/stats.tsx): Fixed unescaped JSX quotes in error messages.
 - [app/about.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/app/about.tsx): Fixed unescaped JSX quotes in intro text.
 - [components/AcceptChallengeSheet.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/components/AcceptChallengeSheet.tsx): Fixed unescaped JSX quotation marks in template string.
 - [components/BugReportSheet.tsx](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/components/BugReportSheet.tsx): Fixed unescaped JSX apostrophes in feedback messages.
-- [HANDOFF.md](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/HANDOFF.md) `[NEW]`: Master architectural handoff document.
+- [HANDOFF.md](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/HANDOFF.md): Master architectural handoff document.
 
 ### 8.2 Recent Milestone Highlights
-1. **21-Day Habit History & 48-Hour Backfill**: 3-week completion matrix sheet ([`HabitHistorySheet.tsx`](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/components/HabitHistorySheet.tsx)), interactive 48h grace window (Today & Yesterday editable with haptic feedback, days 3–21 locked), and isolated streak recalculation.
-2. **Challenge Mode & Social Timeline**: Formal (strict end-date / winner) and informal (continuous streak) habit challenges, camera photo proof capture, and verify/flag peer reactions.
-3. **Friends & Invite System**: 7-character non-ambiguous invite codes (`ABCDEFGHJKMNPQRSTUVWXYZ23456789`), share sheet integration, and server-side invite redemption.
-4. **Smart Reminder Engine**: Per-task and per-habit reminder times + smart daily notification that auto-cancels if the user completes all items before the trigger time.
-5. **Streak Rescue System**: Automatic detection of broken streaks upon app launch/foreground with AI encouragement cards.
+1. **Habit & Task Reminder Persistence & Isolation Fix**: Fixed the reminder drawer state-retention bug in [`ReminderDrawer.tsx`](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/components/ReminderDrawer.tsx) where setting a reminder on one item leaked into subsequent items. Added per-item keying and full lifecycle refresh on cold start/foreground (`refreshHabitReminders` + `refreshTaskReminders`).
+2. **21-Day Habit History & 48-Hour Backfill**: 3-week completion matrix sheet ([`HabitHistorySheet.tsx`](file:///d:/Users/K%20M%20Nehru/Desktop/github%20repos/DockDaily/dockdaily/components/HabitHistorySheet.tsx)), interactive 48h grace window (Today & Yesterday editable with haptic feedback, days 3–21 locked), and isolated streak recalculation.
+3. **Challenge Mode & Social Timeline**: Formal (strict end-date / winner) and informal (continuous streak) habit challenges, camera photo proof capture, and verify/flag peer reactions.
+4. **Friends & Invite System**: 7-character non-ambiguous invite codes (`ABCDEFGHJKMNPQRSTUVWXYZ23456789`), share sheet integration, and server-side invite redemption.
+5. **Smart Reminder Engine**: Per-task and per-habit reminder times + smart daily notification that auto-cancels if the user completes all items before the trigger time.
+6. **Streak Rescue System**: Automatic detection of broken streaks upon app launch/foreground with AI encouragement cards.
 
 ---
 

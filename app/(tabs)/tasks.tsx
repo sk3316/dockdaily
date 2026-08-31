@@ -521,6 +521,7 @@ export default function TasksScreen() {
       )}
 
       <ReminderDrawer
+        key={reminderTask?.id ?? "none"}
         visible={reminderTask !== null}
         onClose={() => setReminderTask(null)}
         itemTitle={reminderTask?.title ?? ""}

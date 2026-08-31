@@ -2,7 +2,7 @@ import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type Props = {
@@ -15,6 +15,29 @@ type Props = {
   onSave: (time: string, date: string | null) => void;
   onRemove: () => void;
 };
+
+function parseReminderDate(currentDate?: string | null): Date {
+  if (currentDate) {
+    const [y, m, d] = currentDate.split("-").map(Number);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return new Date(y, m - 1, d, 0, 0, 0);
+    }
+  }
+  return new Date();
+}
+
+function parseReminderTime(currentTime?: string | null): Date {
+  const dt = new Date();
+  if (currentTime) {
+    const [h, min] = currentTime.split(":").map(Number);
+    if (!isNaN(h) && !isNaN(min)) {
+      dt.setHours(h, min, 0, 0);
+      return dt;
+    }
+  }
+  dt.setHours(9, 0, 0, 0);
+  return dt;
+}
 
 export default function ReminderDrawer({
   visible,
@@ -30,31 +53,23 @@ export default function ReminderDrawer({
   const borderColor = scheme === "dark" ? "#2a2c2e" : "#eee";
   const cardBg = scheme === "dark" ? "#1f2123" : "#f8f8f8";
 
-  const initialDate = (() => {
-    if (currentDate) {
-      const [y, m, d] = currentDate.split("-").map(Number);
-      const dt = new Date();
-      dt.setFullYear(y, m - 1, d);
-      return dt;
-    }
-    return new Date();
-  })();
-
-  const initialTime = (() => {
-    const dt = new Date();
-    if (currentTime) {
-      const [h, min] = currentTime.split(":").map(Number);
-      dt.setHours(h, min, 0, 0);
-    } else {
-      dt.setHours(9, 0, 0, 0);
-    }
-    return dt;
-  })();
-
-  const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [selectedTime, setSelectedTime] = useState(initialTime);
+  const [selectedDate, setSelectedDate] = useState(() =>
+    parseReminderDate(currentDate)
+  );
+  const [selectedTime, setSelectedTime] = useState(() =>
+    parseReminderTime(currentTime)
+  );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setSelectedDate(parseReminderDate(currentDate));
+      setSelectedTime(parseReminderTime(currentTime));
+      setShowDatePicker(false);
+      setShowTimePicker(false);
+    }
+  }, [visible, currentTime, currentDate]);
 
   const handleSave = () => {
     const timeStr = format(selectedTime, "HH:mm");
