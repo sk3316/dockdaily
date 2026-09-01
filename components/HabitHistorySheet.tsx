@@ -45,7 +45,7 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
   );
 
   const days21 = useMemo(() => {
-    return getLastNDays(21, parseLocalDateString(todayKey));
+    return getLastNDays(21, parseLocalDateString(todayKey)).reverse();
   }, [todayKey]);
 
   // Lookup map: habitId_date -> HabitLog
@@ -89,9 +89,9 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
 
   const formattedRange = useMemo(() => {
     if (days21.length === 0) return "";
-    const startDate = parseLocalDateString(days21[0]);
-    const endDate = parseLocalDateString(days21[days21.length - 1]);
-    return `${format(startDate, "MMM d")} – ${format(endDate, "MMM d, yyyy")}`;
+    const newestDate = parseLocalDateString(days21[0]);
+    const oldestDate = parseLocalDateString(days21[days21.length - 1]);
+    return `${format(oldestDate, "MMM d")} – ${format(newestDate, "MMM d, yyyy")}`;
   }, [days21]);
 
   return (
@@ -184,77 +184,35 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
             </Text>
           </View>
         ) : (
-          <View style={[styles.matrixContainer, { borderColor }]}>
+          <View style={[styles.matrixContainer, { borderColor, backgroundColor: cardBg }]}>
             <ScrollView
               style={styles.flexFill}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 24 }}
             >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={true}
-                contentContainerStyle={{ minWidth: "100%" }}
-              >
-                <View>
-                  {/* Date Column Headers */}
-                  <View style={[styles.tableRow, styles.headerRowBorder, { borderBottomColor: borderColor }]}>
-                    {/* Sticky Habit Header Cell */}
-                    <View style={[styles.habitNameCell, { backgroundColor: cardBg, borderRightColor: borderColor }]}>
-                      <Text style={[styles.columnHeaderLabel, { color: colors.icon }]}>
+              <View style={styles.matrixRow}>
+                {/* FIXED HABIT COLUMN — stays static on horizontal swipe */}
+                <View style={styles.fixedColumn}>
+                  {/* Sticky Habit Header Cell */}
+                  <View
+                    style={[
+                      styles.tableRow,
+                      styles.headerRowBorder,
+                      { borderBottomColor: borderColor, backgroundColor: cardBg },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.habitNameCell,
+                        { backgroundColor: cardBg, borderRightColor: borderColor },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.columnHeaderLabel, { color: colors.icon }]}
+                      >
                         HABIT
                       </Text>
                     </View>
-
-                    {/* 21 Date Cells */}
-                    {days21.map((dateStr) => {
-                      const isToday = dateStr === todayKey;
-                      const isYesterday = dateStr === yesterdayKey;
-                      const dateObj = parseLocalDateString(dateStr);
-                      const dayOfWeek = format(dateObj, "EEEEE"); // M, T, W, T, F, S, S
-                      const dayNumber = format(dateObj, "d");
-
-                      return (
-                        <View
-                          key={dateStr}
-                          style={[
-                            styles.dateHeaderCell,
-                            isToday && [styles.todayCellHighlight, { borderColor: colors.tint }],
-                            isYesterday && [styles.yesterdayCellHighlight, { borderColor: colors.tint + "60" }],
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.dayOfWeekText,
-                              { color: isToday ? colors.tint : colors.icon },
-                              isToday && { fontWeight: "800" },
-                            ]}
-                          >
-                            {dayOfWeek}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.dayNumberText,
-                              { color: isToday ? colors.text : colors.icon },
-                              isToday && { fontWeight: "800" },
-                            ]}
-                          >
-                            {dayNumber}
-                          </Text>
-                          {isToday && (
-                            <View style={[styles.todayBadge, { backgroundColor: colors.tint }]}>
-                              <Text style={styles.todayBadgeText}>TODAY</Text>
-                            </View>
-                          )}
-                          {isYesterday && (
-                            <View style={[styles.yesterdayBadge, { backgroundColor: cardBg, borderColor }]}>
-                              <Text style={[styles.yesterdayBadgeText, { color: colors.icon }]}>
-                                YEST
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
                   </View>
 
                   {/* Habit Rows */}
@@ -264,13 +222,18 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
                     return (
                       <View
                         key={habit.id}
-                        style={[styles.tableRow, { borderBottomColor: borderColor }]}
+                        style={[
+                          styles.tableRow,
+                          { borderBottomColor: borderColor, backgroundColor: cardBg },
+                        ]}
                       >
-                        {/* Habit Title Column */}
                         <View
                           style={[
                             styles.habitNameCell,
-                            { backgroundColor: cardBg, borderRightColor: borderColor },
+                            {
+                              backgroundColor: cardBg,
+                              borderRightColor: borderColor,
+                            },
                           ]}
                         >
                           <View style={styles.habitTitleRow}>
@@ -281,7 +244,10 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
                               ]}
                             />
                             <Text
-                              style={[styles.habitTitleText, { color: colors.text }]}
+                              style={[
+                                styles.habitTitleText,
+                                { color: colors.text },
+                              ]}
                               numberOfLines={1}
                               ellipsizeMode="tail"
                             >
@@ -304,8 +270,135 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
                             </Text>
                           </View>
                         </View>
+                      </View>
+                    );
+                  })}
+                </View>
 
-                        {/* 21 Day Cells for this habit */}
+                {/* SCROLLABLE DATE MATRIX */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={true}
+                  style={styles.flexFill}
+                  contentContainerStyle={{ minWidth: "100%" }}
+                >
+                  <View>
+                    {/* Date Column Headers (3-Tier: Day, Date, Month/Badge) */}
+                    <View
+                      style={[
+                        styles.tableRow,
+                        styles.headerRowBorder,
+                        { borderBottomColor: borderColor, backgroundColor: cardBg },
+                      ]}
+                    >
+                      {days21.map((dateStr) => {
+                        const isToday = dateStr === todayKey;
+                        const isYesterday = dateStr === yesterdayKey;
+                        const dateObj = parseLocalDateString(dateStr);
+                        const dayOfWeek = format(dateObj, "EEE").toUpperCase(); // TUE, MON, SUN...
+                        const dayNumber = format(dateObj, "d"); // 1, 31, 30...
+                        const monthStr = format(dateObj, "MMM").toUpperCase(); // SEP, AUG, JUL...
+
+                        return (
+                          <View
+                            key={dateStr}
+                            style={[
+                              styles.dateHeaderCell,
+                              isToday && [
+                                styles.todayHeaderCell,
+                                {
+                                  backgroundColor:
+                                    scheme === "dark"
+                                      ? "rgba(99, 102, 241, 0.18)"
+                                      : "rgba(99, 102, 241, 0.12)",
+                                },
+                              ],
+                              isYesterday && [
+                                styles.yesterdayHeaderCell,
+                                {
+                                  backgroundColor:
+                                    scheme === "dark"
+                                      ? "rgba(255, 255, 255, 0.04)"
+                                      : "rgba(0, 0, 0, 0.03)",
+                                },
+                              ],
+                            ]}
+                          >
+                            {/* Tier 1: Day of Week (e.g. TUE) */}
+                            <Text
+                              style={[
+                                styles.dayOfWeekText,
+                                { color: isToday ? colors.tint : colors.icon },
+                                isToday && styles.boldText,
+                              ]}
+                            >
+                              {dayOfWeek}
+                            </Text>
+
+                            {/* Tier 2: Date Number (e.g. 1, 31) */}
+                            <Text
+                              style={[
+                                styles.dayNumberText,
+                                { color: isToday ? colors.tint : colors.text },
+                                isToday && styles.heavyBoldText,
+                              ]}
+                            >
+                              {dayNumber}
+                            </Text>
+
+                            {/* Tier 3: Month or Status Badge */}
+                            {isToday ? (
+                              <View
+                                style={[
+                                  styles.todayBadge,
+                                  { backgroundColor: colors.tint },
+                                ]}
+                              >
+                                <Text style={styles.todayBadgeText}>TODAY</Text>
+                              </View>
+                            ) : isYesterday ? (
+                              <View
+                                style={[
+                                  styles.yesterdayBadge,
+                                  {
+                                    backgroundColor:
+                                      scheme === "dark" ? "#2a2c2e" : "#e5e7eb",
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.yesterdayBadgeText,
+                                    { color: colors.icon },
+                                  ]}
+                                >
+                                  YEST
+                                </Text>
+                              </View>
+                            ) : (
+                              <Text
+                                style={[
+                                  styles.monthLabelText,
+                                  { color: colors.icon },
+                                ]}
+                              >
+                                {monthStr}
+                              </Text>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* Matrix Habit Rows: 21 Day Cells */}
+                    {habits.map((habit) => (
+                      <View
+                        key={habit.id}
+                        style={[
+                          styles.tableRow,
+                          { borderBottomColor: borderColor, backgroundColor: cellBg },
+                        ]}
+                      >
                         {days21.map((dateStr) => {
                           const isToday = dateStr === todayKey;
                           const isYesterday = dateStr === yesterdayKey;
@@ -322,19 +415,36 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
                               onPress={() => handleCellPress(habit, dateStr)}
                               style={[
                                 styles.gridCell,
-                                isToday && [styles.todayCellHighlight, { borderColor: colors.tint + "40" }],
-                                isYesterday && [styles.yesterdayCellHighlight, { borderColor: colors.tint + "25" }],
+                                isToday && {
+                                  backgroundColor:
+                                    scheme === "dark"
+                                      ? "rgba(99, 102, 241, 0.07)"
+                                      : "rgba(99, 102, 241, 0.05)",
+                                },
+                                isYesterday && {
+                                  backgroundColor:
+                                    scheme === "dark"
+                                      ? "rgba(255, 255, 255, 0.02)"
+                                      : "rgba(0, 0, 0, 0.015)",
+                                },
                               ]}
                             >
                               {completed ? (
                                 <View
                                   style={[
                                     styles.completedDot,
-                                    { backgroundColor: habit.color || colors.tint },
+                                    {
+                                      backgroundColor:
+                                        habit.color || colors.tint,
+                                    },
                                   ]}
                                 >
                                   {habit.type === "boolean" ? (
-                                    <Ionicons name="checkmark" size={13} color="#ffffff" />
+                                    <Ionicons
+                                      name="checkmark"
+                                      size={14}
+                                      color="#ffffff"
+                                    />
                                   ) : (
                                     <Text style={styles.completedCountText}>
                                       {value >= habit.target ? "✓" : value}
@@ -347,7 +457,9 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
                                     styles.missedDot,
                                     {
                                       backgroundColor: cellBg,
-                                      borderColor: isEditable ? colors.tint + "50" : borderColor,
+                                      borderColor: isEditable
+                                        ? colors.tint + "80"
+                                        : borderColor,
                                     },
                                     isEditable && styles.editableMissedDot,
                                   ]}
@@ -355,15 +467,15 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
                                   {!isEditable && (
                                     <Ionicons
                                       name="lock-closed"
-                                      size={8}
-                                      color={colors.icon + "60"}
+                                      size={9}
+                                      color={colors.icon + "50"}
                                     />
                                   )}
                                   {isEditable && (
                                     <View
                                       style={[
                                         styles.editableInnerDot,
-                                        { backgroundColor: colors.tint + "40" },
+                                        { backgroundColor: colors.tint },
                                       ]}
                                     />
                                   )}
@@ -373,10 +485,10 @@ export default function HabitHistorySheet({ visible, onClose }: Props) {
                           );
                         })}
                       </View>
-                    );
-                  })}
-                </View>
-              </ScrollView>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
             </ScrollView>
           </View>
         )}
@@ -489,18 +601,25 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: "hidden",
   },
+  matrixRow: {
+    flexDirection: "row",
+  },
+  fixedColumn: {
+    zIndex: 2,
+  },
   tableRow: {
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
+    height: 56,
   },
   headerRowBorder: {
-    paddingVertical: 8,
+    height: 68,
   },
   habitNameCell: {
-    width: 130,
+    width: 126,
+    height: "100%",
     paddingHorizontal: 10,
-    paddingVertical: 8,
     justifyContent: "center",
     borderRightWidth: 1,
     zIndex: 2,
@@ -508,7 +627,7 @@ const styles = StyleSheet.create({
   columnHeaderLabel: {
     fontSize: 10,
     fontWeight: "800",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   habitTitleRow: {
     flexDirection: "row",
@@ -537,64 +656,74 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   dateHeaderCell: {
-    width: 36,
+    width: 44,
+    height: 58,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 4,
     marginHorizontal: 1,
+    borderRadius: 8,
+  },
+  todayHeaderCell: {
+    borderRadius: 8,
+  },
+  yesterdayHeaderCell: {
+    borderRadius: 8,
   },
   dayOfWeekText: {
-    fontSize: 10,
-    fontWeight: "600",
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   dayNumberText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "700",
-    marginTop: 1,
+    marginVertical: 1,
   },
-  todayCellHighlight: {
-    backgroundColor: "rgba(99, 102, 241, 0.08)",
-    borderRadius: 6,
-    borderWidth: 1,
+  monthLabelText: {
+    fontSize: 8,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    opacity: 0.8,
   },
-  yesterdayCellHighlight: {
-    backgroundColor: "rgba(99, 102, 241, 0.04)",
-    borderRadius: 6,
-    borderWidth: 1,
+  boldText: {
+    fontWeight: "800",
+  },
+  heavyBoldText: {
+    fontWeight: "900",
   },
   todayBadge: {
     borderRadius: 4,
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
     paddingVertical: 1,
-    marginTop: 2,
   },
   todayBadgeText: {
     color: "#ffffff",
     fontSize: 7,
     fontWeight: "900",
+    letterSpacing: 0.3,
   },
   yesterdayBadge: {
-    borderWidth: 1,
     borderRadius: 4,
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
     paddingVertical: 1,
-    marginTop: 2,
   },
   yesterdayBadgeText: {
     fontSize: 7,
-    fontWeight: "700",
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
   gridCell: {
-    width: 36,
-    height: 44,
+    width: 44,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
     marginHorizontal: 1,
   },
   completedDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -642,3 +771,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
