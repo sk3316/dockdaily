@@ -69,6 +69,13 @@ export async function initDatabase() {
     // Column already exists — ignore
   }
 
+  // Recurring & interval habit reminder configuration (JSON)
+  try {
+    await database.execAsync('ALTER TABLE habits ADD COLUMN reminder_config TEXT');
+  } catch (_) {
+    // Column already exists — ignore
+  }
+
   // Deduplicate habit_logs before adding unique index
   try {
     await database.execAsync(`

@@ -1,10 +1,14 @@
 import { create } from 'zustand';
 import { getDatabase } from '../db/database';
 import { getLocalDateString, calculateStreak } from '../utils/streak';
-import { Habit, HabitLog } from '../types';
+import { Habit, HabitLog, HabitReminderConfig } from '../types';
 import { randomUUID } from 'expo-crypto';
 import { scheduleSync } from './syncScheduler';
-import { scheduleHabitReminder, cancelHabitReminder } from '../utils/notifications';
+import {
+  scheduleHabitReminder,
+  cancelHabitReminder,
+  resolveHabitReminderTimes,
+} from '../utils/notifications';
 
 function todayStr() {
   return getLocalDateString();
@@ -34,7 +38,11 @@ type HabitStore = {
   ) => Promise<void>;
   deleteHabit: (id: string) => Promise<void>;
   reorderHabits: (orderedIds: string[]) => Promise<void>;
-  setHabitReminder: (id: string, time: string | null, date?: string | null) => Promise<void>;
+  setHabitReminder: (
+    id: string,
+    configOrTime: HabitReminderConfig | string | null,
+    date?: string | null
+  ) => Promise<void>;
   checkForBrokenStreaks: () => Promise<BrokenStreak[]>;
 };
 
@@ -205,18 +213,46 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
     scheduleSync();
   },
 
-  setHabitReminder: async (id, time, date = null) => {
+  setHabitReminder: async (id, configOrTime, date = null) => {
     const database = await getDatabase();
+    let reminderTime: string | null = null;
+    let reminderDate: string | null = null;
+    let reminderConfigStr: string | null = null;
+    let timesToSchedule: string[] = [];
+
+    if (!configOrTime) {
+      reminderTime = null;
+      reminderDate = null;
+      reminderConfigStr = null;
+    } else if (typeof configOrTime === 'string') {
+      reminderTime = configOrTime;
+      reminderDate = date;
+      const config: HabitReminderConfig = {
+        mode: 'single',
+        time: configOrTime,
+        startDate: date,
+      };
+      reminderConfigStr = JSON.stringify(config);
+      timesToSchedule = [configOrTime];
+    } else {
+      const config = configOrTime;
+      timesToSchedule = resolveHabitReminderTimes(config);
+      reminderTime = timesToSchedule[0] ?? null;
+      reminderDate = config.startDate ?? date ?? null;
+      reminderConfigStr = JSON.stringify(config);
+    }
+
     await database.runAsync(
-      'UPDATE habits SET reminder_time = ?, reminder_date = ?, synced = 0 WHERE id = ?',
-      time,
-      time ? date : null,
+      'UPDATE habits SET reminder_time = ?, reminder_date = ?, reminder_config = ?, synced = 0 WHERE id = ?',
+      reminderTime,
+      reminderDate,
+      reminderConfigStr,
       id
     );
 
     const habit = get().habits.find((h) => h.id === id);
-    if (time && habit) {
-      await scheduleHabitReminder(id, habit.title, time, date);
+    if (timesToSchedule.length > 0 && habit) {
+      await scheduleHabitReminder(id, habit.title, timesToSchedule, reminderDate);
     } else {
       await cancelHabitReminder(id);
     }

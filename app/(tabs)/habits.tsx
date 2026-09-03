@@ -7,7 +7,7 @@ import { useCelebration } from "@/hooks/use-celebration";
 import { useAIStore } from "@/store/useAIStore";
 import { useHabitStore } from "@/store/useHabitStore";
 import { useTaskStore } from "@/store/useTaskStore";
-import { Habit } from "@/types";
+import { Habit, HabitReminderConfig } from "@/types";
 import { requestNotificationPermissions } from "@/utils/notifications";
 import { calculateStreak } from "@/utils/streak";
 import { Ionicons } from "@expo/vector-icons";
@@ -37,6 +37,32 @@ const HABIT_TYPES: { key: Habit["type"]; label: string }[] = [
   { key: "count", label: "Count" },
   { key: "duration", label: "Minutes" },
 ];
+
+function getReminderBadgeText(habit: Habit): string | null {
+  if (!habit.reminder_time && !habit.reminder_config) return null;
+  if (habit.reminder_config) {
+    try {
+      const cfg: HabitReminderConfig = JSON.parse(habit.reminder_config);
+      if (cfg.mode === "interval" && cfg.interval) {
+        const hrs = cfg.interval.stepMinutes / 60;
+        return `Every ${hrs % 1 === 0 ? hrs : hrs.toFixed(1)}h`;
+      }
+      if (cfg.mode === "times" && cfg.times && cfg.times.length > 1) {
+        const [h, m] = cfg.times[0].split(":").map(Number);
+        const ampm = h >= 12 ? "PM" : "AM";
+        const hour12 = h % 12 || 12;
+        return `${hour12}:${String(m).padStart(2, "0")} ${ampm} (+${cfg.times.length - 1})`;
+      }
+    } catch {}
+  }
+  if (habit.reminder_time) {
+    const [h, m] = habit.reminder_time.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
+  }
+  return null;
+}
 
 export default function HabitsScreen() {
   const {
@@ -183,7 +209,11 @@ export default function HabitsScreen() {
     setEditingTitleText("");
   };
 
-  const handleSaveReminder = async (time: string, date: string | null) => {
+  const handleSaveReminder = async (
+    time: string,
+    date: string | null,
+    config?: HabitReminderConfig
+  ) => {
     if (!reminderHabit) return;
     const granted = await requestNotificationPermissions();
     if (!granted) {
@@ -193,7 +223,7 @@ export default function HabitsScreen() {
       );
       return;
     }
-    await setHabitReminder(reminderHabit.id, time, date);
+    await setHabitReminder(reminderHabit.id, config ?? time, date);
   };
 
   const handleRemoveReminder = async () => {
@@ -278,6 +308,14 @@ export default function HabitsScreen() {
                 >
                   {streak} day{streak === 1 ? "" : "s"}
                 </Text>
+                {getReminderBadgeText(item) && (
+                  <View style={styles.reminderBadge}>
+                    <Ionicons name="notifications" size={10} color={colors.tint} />
+                    <Text style={[styles.reminderBadgeText, { color: colors.tint }]}>
+                      {getReminderBadgeText(item)}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -566,6 +604,7 @@ export default function HabitsScreen() {
         itemType="habit"
         currentTime={reminderHabit?.reminder_time}
         currentDate={reminderHabit?.reminder_date}
+        currentConfig={reminderHabit?.reminder_config}
         onSave={handleSaveReminder}
         onRemove={handleRemoveReminder}
       />
@@ -622,8 +661,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     marginTop: 4,
+    flexWrap: "wrap",
   },
   streakText: { fontSize: 13, fontWeight: "500" },
+  reminderBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    backgroundColor: "rgba(99, 102, 241, 0.12)",
+  },
+  reminderBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
   checkbox: { padding: 2 },
   counterRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   counterButton: {

@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { getLocalDateString } from "@/utils/streak";
+import { HabitReminderConfig } from "@/types";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -111,10 +112,11 @@ export async function handleSmartNotification(
 }
 
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Per-item reminders (habits & tasks)
 // ─────────────────────────────────────────────
 
-function habitReminderId(habitId: string) {
+function habitReminderPrefix(habitId: string) {
   return `dockdaily-habit-${habitId}`;
 }
 
@@ -122,62 +124,157 @@ function taskReminderId(taskId: string) {
   return `dockdaily-task-${taskId}`;
 }
 
-export async function scheduleHabitReminder(
-  habitId: string,
-  title: string,
-  reminderTime: string,
-  reminderDate?: string | null // YYYY-MM-DD, optional start date
-): Promise<void> {
-  const [hour, minute] = reminderTime.split(":").map(Number);
-  const identifier = habitReminderId(habitId);
+/**
+ * Generates an array of "HH:MM" 24h strings starting from startTime up to endTime
+ * at stepMinutes intervals (e.g. 10:00 to 20:00, step 120 -> 10:00, 12:00, 14:00, 16:00, 18:00, 20:00).
+ * Capped at 12 slots to avoid overflowing iOS 64-notification limits.
+ */
+export function generateIntervalSlots(
+  startTime: string,
+  endTime: string,
+  stepMinutes: number
+): string[] {
+  const [startH, startM] = startTime.split(":").map(Number);
+  const [endH, endM] = endTime.split(":").map(Number);
 
-  await Notifications.cancelScheduledNotificationAsync(identifier).catch(
-    () => {},
-  );
+  if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) {
+    return [startTime];
+  }
 
-  const todayKey = getLocalDateString();
+  const startTotal = startH * 60 + startM;
+  const endTotal = endH * 60 + endM;
 
-  if (reminderDate && reminderDate > todayKey) {
-    // Start date hasn't arrived yet — schedule a ONE-TIME reminder for that exact
-    // date+time. Once the app is opened on/after that date, refreshHabitReminders()
-    // will re-call this function and it'll fall into the daily-recurring branch below.
-    const [year, month, day] = reminderDate.split("-").map(Number);
-    const startDateTime = new Date(year, month - 1, day, hour, minute, 0);
+  if (endTotal <= startTotal) {
+    return [startTime];
+  }
 
-    await Notifications.scheduleNotificationAsync({
-      identifier,
-      content: {
-        title: "✅ Habit reminder",
-        body: `Time for "${title}"`,
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: startDateTime,
-      },
-    });
-  } else {
-    // No start date, or the start date has arrived/passed — normal daily recurring
-    await Notifications.scheduleNotificationAsync({
-      identifier,
-      content: {
-        title: "✅ Habit reminder",
-        body: `Time for "${title}"`,
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
-      },
-    });
+  const slots: string[] = [];
+  const step = Math.max(15, stepMinutes); // Minimum 15-minute floor
+
+  for (let cur = startTotal; cur <= endTotal; cur += step) {
+    const h = Math.floor(cur / 60);
+    const m = cur % 60;
+    slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    if (slots.length >= 12) break;
+  }
+
+  return slots;
+}
+
+/**
+ * Resolves any HabitReminderConfig or legacy reminder_time into an array of discrete "HH:MM" times.
+ */
+export function resolveHabitReminderTimes(
+  config?: HabitReminderConfig | null,
+  fallbackTime?: string | null
+): string[] {
+  if (!config) {
+    return fallbackTime ? [fallbackTime] : [];
+  }
+
+  if (config.mode === "single") {
+    return config.time ? [config.time] : (fallbackTime ? [fallbackTime] : []);
+  }
+
+  if (config.mode === "times") {
+    if (config.times && config.times.length > 0) {
+      return config.times;
+    }
+    return config.time ? [config.time] : (fallbackTime ? [fallbackTime] : []);
+  }
+
+  if (config.mode === "interval") {
+    if (config.interval?.startTime && config.interval?.endTime) {
+      return generateIntervalSlots(
+        config.interval.startTime,
+        config.interval.endTime,
+        config.interval.stepMinutes || 120
+      );
+    }
+    return config.time ? [config.time] : (fallbackTime ? [fallbackTime] : []);
+  }
+
+  return fallbackTime ? [fallbackTime] : [];
+}
+
+/**
+ * Cancels all scheduled notifications associated with a habit (both legacy and multi-slot).
+ */
+export async function cancelHabitReminder(habitId: string): Promise<void> {
+  try {
+    const prefix = habitReminderPrefix(habitId);
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const item of scheduled) {
+      if (item.identifier === prefix || item.identifier.startsWith(`${prefix}-`)) {
+        await Notifications.cancelScheduledNotificationAsync(item.identifier).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error("[Notifications] Error canceling habit reminders:", err);
   }
 }
 
-export async function cancelHabitReminder(habitId: string): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(
-    habitReminderId(habitId),
-  ).catch(() => {});
+/**
+ * Schedules one or more daily recurring reminders for a habit.
+ */
+export async function scheduleHabitReminder(
+  habitId: string,
+  title: string,
+  reminderTimeOrTimes: string | string[],
+  reminderDate?: string | null // YYYY-MM-DD, optional start date
+): Promise<void> {
+  await cancelHabitReminder(habitId);
+
+  const times = Array.isArray(reminderTimeOrTimes)
+    ? reminderTimeOrTimes
+    : [reminderTimeOrTimes];
+
+  if (times.length === 0) return;
+
+  const todayKey = getLocalDateString();
+  const isFutureDate = reminderDate && reminderDate > todayKey;
+
+  for (const timeStr of times) {
+    const [hour, minute] = timeStr.split(":").map(Number);
+    if (isNaN(hour) || isNaN(minute)) continue;
+
+    const timeTag = `${String(hour).padStart(2, "0")}${String(minute).padStart(2, "0")}`;
+    const identifier = `${habitReminderPrefix(habitId)}-${timeTag}`;
+
+    if (isFutureDate) {
+      const [year, month, day] = reminderDate.split("-").map(Number);
+      const startDateTime = new Date(year, month - 1, day, hour, minute, 0);
+
+      if (startDateTime > new Date()) {
+        await Notifications.scheduleNotificationAsync({
+          identifier,
+          content: {
+            title: "✅ Habit reminder",
+            body: `Time for "${title}"`,
+            sound: true,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: startDateTime,
+          },
+        }).catch(() => {});
+      }
+    } else {
+      await Notifications.scheduleNotificationAsync({
+        identifier,
+        content: {
+          title: "✅ Habit reminder",
+          body: `Time for "${title}"`,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour,
+          minute,
+        },
+      }).catch(() => {});
+    }
+  }
 }
 
 export async function scheduleTaskReminder(
@@ -234,24 +331,30 @@ export async function cancelTaskReminder(taskId: string): Promise<void> {
 }
 
 // Re-evaluates every habit's reminder schedule — call this on app foreground/init.
-// Habits with a future start date will self-correct into daily-recurring mode
-// once that date arrives, with zero extra state tracking needed.
 export async function refreshHabitReminders(
   habits: {
     id: string;
     title: string;
     reminder_time?: string | null;
     reminder_date?: string | null;
+    reminder_config?: string | null;
   }[],
 ): Promise<void> {
   for (const habit of habits) {
-    if (habit.reminder_time) {
-      await scheduleHabitReminder(
-        habit.id,
-        habit.title,
-        habit.reminder_time,
-        habit.reminder_date,
-      );
+    let parsedConfig: HabitReminderConfig | null = null;
+    if (habit.reminder_config) {
+      try {
+        parsedConfig = JSON.parse(habit.reminder_config);
+      } catch (_) {}
+    }
+
+    const times = resolveHabitReminderTimes(parsedConfig, habit.reminder_time);
+    const startDate = parsedConfig?.startDate ?? habit.reminder_date;
+
+    if (times.length > 0) {
+      await scheduleHabitReminder(habit.id, habit.title, times, startDate);
+    } else {
+      await cancelHabitReminder(habit.id);
     }
   }
 }

@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS habits (
   sort_order INTEGER NOT NULL DEFAULT 0,
   reminder_time TEXT,
   reminder_date TEXT,
+  reminder_config TEXT,
   last_known_streak INTEGER NOT NULL DEFAULT 0
 );
 `;

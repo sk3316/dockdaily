@@ -368,7 +368,25 @@ All Edge Functions reside under the Supabase project endpoint `${EXPO_PUBLIC_SUP
 3. **Challenge Mode & Social Timeline**: Formal (strict end-date / winner) and informal (continuous streak) habit challenges, camera photo proof capture, and verify/flag peer reactions.
 4. **Friends & Invite System**: 7-character non-ambiguous invite codes (`ABCDEFGHJKMNPQRSTUVWXYZ23456789`), share sheet integration, and server-side invite redemption.
 5. **Smart Reminder Engine**: Per-task and per-habit reminder times + smart daily notification that auto-cancels if the user completes all items before the trigger time.
-6. **Streak Rescue System**: Automatic detection of broken streaks upon app launch/foreground with AI encouragement cards.
+### 8.3 In-Progress Architecture: Multi-Slot & Interval Recurring Habit Reminders
+
+- **Problem & Motivation**: Habits such as hydration ("drink water every 2 hours between 10 AM and 8 PM") and medication ("take medicine at 10 AM, 2 PM, and 8 PM") require multiple daily touchpoints rather than a single fixed reminder.
+- **Offline-First Zero-Cloud Principle**:
+  - No Supabase schema changes, Edge Functions, or cron runners needed.
+  - Handled 100% locally via `expo-notifications` using discrete `DAILY` Calendar Triggers (`Notifications.SchedulableTriggerInputTypes.DAILY`).
+  - Stored locally in SQLite (`dockdaily.db`) with automatic self-healing migration `ALTER TABLE habits ADD COLUMN reminder_config TEXT`.
+- **Modes Supported**:
+  1. `single`: Single daily reminder at a fixed time (legacy / default).
+  2. `times`: Discrete multiple times per day (e.g., `["10:00", "14:00", "20:00"]`).
+  3. `interval`: Start time (`10:00`), End time (`20:00`), and interval step (`1h`, `1.5h`, `2h`, `3h`), generating discrete daily slots within the active window (preventing midnight alerts).
+- **Notification Lifecycle & Identifiers**:
+  - Notification ID pattern: `dockdaily-habit-${habitId}-${hour}-${minute}`.
+  - Bulk cancellation: Prefix query `Notifications.getAllScheduledNotificationsAsync()` filtering `identifier.startsWith("dockdaily-habit-" + habitId)`.
+  - Lifecycle refresh: Re-evaluated on app cold start and active foreground in `app/_layout.tsx`.
+- **UI Architecture**:
+  - Segmented control in `components/ReminderDrawer.tsx` (`Once a day` | `Specific times` | `Interval window`).
+  - Interactive chip management for specific times (`+ Add time`, `✕` remove).
+  - Interval stepper/picker + live schedule preview list.
 
 ---
 
@@ -380,6 +398,12 @@ All Edge Functions reside under the Supabase project endpoint `${EXPO_PUBLIC_SUP
     {
       "level": "P0 - Immediate / High Value",
       "items": [
+        {
+          "id": "TASK-000",
+          "title": "Recurring & Interval Habit Reminders",
+          "file": "utils/notifications.ts, components/ReminderDrawer.tsx, store/useHabitStore.ts, db/database.ts, types/index.ts",
+          "description": "Support multi-time slots and interval-based recurring habit reminders (e.g. water every 2 hours, medicine at 10 AM / 2 PM) entirely offline via local SQLite and expo-notifications."
+        },
         {
           "id": "TASK-001",
           "title": "Supabase Realtime Subscriptions",

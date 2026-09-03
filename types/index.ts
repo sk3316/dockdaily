@@ -12,6 +12,20 @@ export type Task = {
   reminder_date?: string | null; // YYYY-MM-DD
 };
 
+export type HabitReminderMode = 'single' | 'times' | 'interval';
+
+export type HabitReminderConfig = {
+  mode: HabitReminderMode;
+  time?: string | null; // For 'single' mode (HH:MM)
+  times?: string[]; // For 'times' mode (array of HH:MM)
+  interval?: {
+    startTime: string; // HH:MM
+    endTime: string; // HH:MM
+    stepMinutes: number; // e.g. 60, 90, 120, 180, 240
+  };
+  startDate?: string | null; // YYYY-MM-DD
+};
+
 export type Habit = {
   id: string;
   title: string;
@@ -21,8 +35,9 @@ export type Habit = {
   color: string;
   created_at: string;
   sort_order: number;
-  reminder_time?: string | null; // HH:MM format
+  reminder_time?: string | null; // HH:MM format (primary/legacy time)
   reminder_date?: string | null; // YYYY-MM-DD, start date for daily reminders
+  reminder_config?: string | null; // JSON-serialized HabitReminderConfig
   last_known_streak?: number; // used for rescue detection
 };
 
