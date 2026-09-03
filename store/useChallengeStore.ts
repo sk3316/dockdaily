@@ -39,6 +39,25 @@ export type Challenge = {
   participants: ChallengeParticipant[];
 };
 
+export function calculateWinner(
+  participants: ChallengeParticipant[],
+): ChallengeParticipant | null {
+  const accepted = participants.filter((p) => p.status === "accepted");
+  if (accepted.length === 0) return null;
+
+  const sorted = [...accepted].sort((a, b) => {
+    if (b.totalCompletions !== a.totalCompletions) {
+      return b.totalCompletions - a.totalCompletions;
+    }
+    if (b.bestStreak !== a.bestStreak) {
+      return b.bestStreak - a.bestStreak;
+    }
+    return b.currentStreak - a.currentStreak;
+  });
+
+  return sorted.length > 0 && sorted[0].totalCompletions > 0 ? sorted[0] : null;
+}
+
 type ChallengeStore = {
   challenges: Challenge[];
   loading: boolean;
@@ -57,6 +76,9 @@ type ChallengeStore = {
   acceptChallenge: (challengeId: string, habitId: string) => Promise<void>;
   declineChallenge: (challengeId: string) => Promise<void>;
   leaveChallenge: (challengeId: string) => Promise<void>;
+  completeChallenge: (
+    challengeId: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   submitCheckin: (
     challengeId: string,
     proofPhotoUrl?: string | null,
@@ -131,17 +153,11 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
         .select("id, display_name, avatar_url")
         .in("id", userIds);
 
-      const challenges: Challenge[] = (challengeRows ?? []).map((c) => ({
-        id: c.id,
-        title: c.title,
-        mode: c.mode,
-        startDate: c.start_date,
-        endDate: c.end_date,
-        status: c.status,
-        requiresProof: c.requires_proof,
-        createdBy: c.created_by,
-        winnerUserId: c.winner_user_id,
-        participants: (participantRows ?? [])
+      const today = getLocalDateString();
+      const challengesToSync: { id: string; winnerUserId: string | null }[] = [];
+
+      const challenges: Challenge[] = (challengeRows ?? []).map((c) => {
+        const cParticipants: ChallengeParticipant[] = (participantRows ?? [])
           .filter((p) => p.challenge_id === c.id)
           .map((p) => {
             const profile = profileRows?.find((pr) => pr.id === p.user_id);
@@ -155,10 +171,58 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
               bestStreak: p.best_streak,
               totalCompletions: p.total_completions,
             };
-          }),
-      }));
+          });
+
+        const isFormalExpired =
+          c.mode === "formal" && !!c.end_date && today > c.end_date;
+        const isCompleted = c.status === "completed" || isFormalExpired;
+
+        let winnerUserId = c.winner_user_id;
+        if (isCompleted && !winnerUserId) {
+          const winner = calculateWinner(cParticipants);
+          winnerUserId = winner?.userId ?? null;
+        }
+
+        if (c.status === "active" && isFormalExpired) {
+          challengesToSync.push({ id: c.id, winnerUserId });
+        }
+
+        return {
+          id: c.id,
+          title: c.title,
+          mode: c.mode,
+          startDate: c.start_date,
+          endDate: c.end_date,
+          status: isCompleted ? "completed" : c.status,
+          requiresProof: c.requires_proof,
+          createdBy: c.created_by,
+          winnerUserId,
+          participants: cParticipants,
+        };
+      });
 
       set({ challenges, loading: false });
+
+      // In the background, persist auto-completed challenges to Supabase
+      if (challengesToSync.length > 0) {
+        for (const item of challengesToSync) {
+          supabase
+            .from("challenges")
+            .update({
+              status: "completed",
+              winner_user_id: item.winnerUserId,
+            })
+            .eq("id", item.id)
+            .then(({ error }) => {
+              if (error) {
+                console.warn(
+                  "[Challenge] Failed to persist auto-completed status:",
+                  error.message,
+                );
+              }
+            });
+        }
+      }
     } catch (err: any) {
       console.error("[Challenge] loadChallenges error:", err);
       set({
@@ -301,6 +365,59 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
     }
   },
 
+  completeChallenge: async (challengeId: string) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return { success: false, error: "Not signed in" };
+
+      const challenge = get().challenges.find((c) => c.id === challengeId);
+      if (!challenge) return { success: false, error: "Challenge not found" };
+
+      const winner = calculateWinner(challenge.participants);
+      const winnerUserId = winner?.userId ?? null;
+
+      const { error: updateError } = await supabase
+        .from("challenges")
+        .update({
+          status: "completed",
+          winner_user_id: winnerUserId,
+        })
+        .eq("id", challengeId);
+
+      if (updateError) {
+        console.warn("[Challenge] completeChallenge Supabase warning:", updateError.message);
+      }
+
+      // Notify accepted participants
+      const acceptedParticipants = challenge.participants.filter(
+        (p) => p.status === "accepted",
+      );
+      if (acceptedParticipants.length > 0) {
+        const { sendPush } = await import("@/utils/pushNotify");
+        const participantIds = acceptedParticipants.map((p) => p.userId);
+        const winnerName = winner
+          ? (winner.userId === user.id ? "You" : winner.displayName)
+          : "No one";
+        void sendPush(
+          participantIds,
+          `🏆 Challenge Ended: ${challenge.title}`,
+          winner
+            ? `${winnerName} won the challenge with ${winner.totalCompletions} completions!`
+            : "The challenge has been closed.",
+          { type: "challenge_ended", challengeId, winnerUserId },
+        );
+      }
+
+      await get().loadChallenges();
+      return { success: true };
+    } catch (err: any) {
+      console.error("[Challenge] completeChallenge error:", err);
+      return { success: false, error: err.message ?? "Failed to end challenge" };
+    }
+  },
+
   submitCheckin: async (challengeId, proofPhotoUrl = null) => {
     try {
       const {
@@ -309,6 +426,57 @@ export const useChallengeStore = create<ChallengeStore>((set, get) => ({
       if (!user) return { success: false, error: "Not signed in" };
 
       const today = getLocalDateString();
+
+      // Guard: Check if challenge is already closed or expired in local state
+      const targetChallenge = get().challenges.find((c) => c.id === challengeId);
+      if (targetChallenge) {
+        const isFormalExpired =
+          targetChallenge.mode === "formal" &&
+          !!targetChallenge.endDate &&
+          today > targetChallenge.endDate;
+
+        if (
+          targetChallenge.status === "completed" ||
+          targetChallenge.status === "cancelled" ||
+          isFormalExpired
+        ) {
+          if (isFormalExpired && targetChallenge.status === "active") {
+            void get().completeChallenge(challengeId);
+          }
+          return {
+            success: false,
+            error: "This challenge has ended and is now closed. Check-ins are locked.",
+          };
+        }
+      }
+
+      // Guard: Also check DB in case local state was stale
+      const { data: dbChallenge } = await supabase
+        .from("challenges")
+        .select("status, mode, end_date")
+        .eq("id", challengeId)
+        .maybeSingle();
+
+      if (dbChallenge) {
+        const isDbExpired =
+          dbChallenge.mode === "formal" &&
+          !!dbChallenge.end_date &&
+          today > dbChallenge.end_date;
+
+        if (
+          dbChallenge.status === "completed" ||
+          dbChallenge.status === "cancelled" ||
+          isDbExpired
+        ) {
+          if (isDbExpired && dbChallenge.status === "active") {
+            void get().completeChallenge(challengeId);
+          }
+          return {
+            success: false,
+            error: "This challenge has ended and is now closed. Check-ins are locked.",
+          };
+        }
+      }
 
       const { error: insertError } = await supabase
         .from("challenge_checkins")

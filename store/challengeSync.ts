@@ -1,3 +1,5 @@
+import { getLocalDateString } from "@/utils/streak";
+
 // Bridges habit completion and challenge check-ins bidirectionally without
 // creating a circular import between useHabitStore and useChallengeStore.
 
@@ -11,8 +13,17 @@ export async function syncHabitToChallenge(habitId: string) {
   const { challenges, submitCheckin, hasCheckedInToday } =
     useChallengeStore.getState();
 
+  const today = getLocalDateString();
+
   for (const challenge of challenges) {
     if (challenge.status !== "active") continue;
+    if (
+      challenge.mode === "formal" &&
+      challenge.endDate &&
+      today > challenge.endDate
+    ) {
+      continue;
+    }
     const myParticipant = challenge.participants.find(
       (p) =>
         p.userId === user.id &&

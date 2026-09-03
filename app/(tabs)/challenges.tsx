@@ -2,8 +2,9 @@ import AcceptChallengeSheet from "@/components/AcceptChallengeSheet";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useChallengeStore } from "@/store/useChallengeStore";
-import { useHabitStore } from "@/store/useHabitStore";
 import { useFriendsStore } from "@/store/useFriendsStore";
+import { useHabitStore } from "@/store/useHabitStore";
+import { getLocalDateString } from "@/utils/streak";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { router } from "expo-router";
@@ -42,15 +43,29 @@ export default function ChallengesScreen() {
     loadFriends();
   }, [loadChallenges, loadFriends]);
 
+  const today = getLocalDateString();
   const myUserId = user?.id;
 
-  const pendingInvites = challenges.filter((c) =>
-    c.participants.some((p) => p.userId === myUserId && p.status === "invited"),
+  const pendingInvites = challenges.filter(
+    (c) =>
+      c.status === "active" &&
+      !(c.mode === "formal" && c.endDate && today > c.endDate) &&
+      c.participants.some((p) => p.userId === myUserId && p.status === "invited"),
   );
 
   const activeChallenges = challenges.filter(
     (c) =>
       c.status === "active" &&
+      !(c.mode === "formal" && c.endDate && today > c.endDate) &&
+      c.participants.some(
+        (p) => p.userId === myUserId && p.status === "accepted",
+      ),
+  );
+
+  const completedChallenges = challenges.filter(
+    (c) =>
+      (c.status === "completed" ||
+        (c.mode === "formal" && !!c.endDate && today > c.endDate)) &&
       c.participants.some(
         (p) => p.userId === myUserId && p.status === "accepted",
       ),
@@ -259,6 +274,108 @@ export default function ChallengesScreen() {
               );
             })
           )}
+
+          {completedChallenges.length > 0 && (
+            <>
+              <Text
+                style={[
+                  styles.sectionHeader,
+                  {
+                    color: colors.text,
+                    marginTop: 28,
+                  },
+                ]}
+              >
+                Completed Challenges ({completedChallenges.length})
+              </Text>
+
+              {completedChallenges.map((c) => {
+                const sorted = [...c.participants]
+                  .filter((p) => p.status === "accepted")
+                  .sort((a, b) => b.totalCompletions - a.totalCompletions);
+                const winner = c.winnerUserId
+                  ? c.participants.find((p) => p.userId === c.winnerUserId)
+                  : sorted.length > 0 && sorted[0].totalCompletions > 0
+                    ? sorted[0]
+                    : null;
+                const isWinner = winner?.userId === myUserId;
+
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    onPress={() => router.push(`/challenge/${c.id}` as any)}
+                    style={[
+                      styles.challengeCard,
+                      {
+                        backgroundColor: cardBg,
+                        borderColor: isWinner ? "#f59e0b" : borderColor,
+                      },
+                    ]}
+                  >
+                    <View style={styles.challengeCardHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.challengeCardTitle,
+                            { color: colors.text },
+                          ]}
+                        >
+                          {c.title}
+                        </Text>
+                        {winner ? (
+                          <View style={styles.winnerTagRow}>
+                            <Ionicons name="trophy" size={13} color="#f59e0b" />
+                            <Text
+                              style={[
+                                styles.winnerTagText,
+                                { color: isWinner ? "#f59e0b" : colors.text },
+                              ]}
+                            >
+                              {isWinner
+                                ? `You won! (${winner.totalCompletions} check-ins)`
+                                : `Winner: ${winner.displayName} (${winner.totalCompletions})`}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.completedSubtext,
+                              { color: colors.icon },
+                            ]}
+                          >
+                            Finished • No winner
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.completedBadge}>
+                        <Text style={styles.completedBadgeText}>Closed</Text>
+                      </View>
+                    </View>
+                    <View style={styles.challengeCardMeta}>
+                      <View style={styles.metaItem}>
+                        <Ionicons name="people" size={14} color={colors.icon} />
+                        <Text style={[styles.metaText, { color: colors.icon }]}>
+                          {sorted.length} participants
+                        </Text>
+                      </View>
+                      {c.endDate && (
+                        <View style={styles.metaItem}>
+                          <Ionicons
+                            name="calendar-outline"
+                            size={14}
+                            color={colors.icon}
+                          />
+                          <Text style={[styles.metaText, { color: colors.icon }]}>
+                            Ended {format(new Date(c.endDate), "MMM d, yyyy")}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
         </ScrollView>
       )}
 
@@ -344,4 +461,20 @@ const styles = StyleSheet.create({
   challengeCardMeta: { flexDirection: "row", gap: 16 },
   metaItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: { fontSize: 12, fontWeight: "600" },
+  winnerTagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 4,
+  },
+  winnerTagText: { fontSize: 13, fontWeight: "700" },
+  completedSubtext: { fontSize: 12, marginTop: 4 },
+  completedBadge: {
+    backgroundColor: "rgba(107, 114, 128, 0.18)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  completedBadgeText: { fontSize: 11, fontWeight: "700", color: "#888" },
 });
