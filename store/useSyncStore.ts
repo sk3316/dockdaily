@@ -337,7 +337,7 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
              WHERE id = ?`,
             remote.title, remote.type, remote.target,
             remote.frequency, remote.color ?? local.color ?? '#6366f1',
-            remote.sort_order !== undefined && remote.sort_order !== null ? remote.sort_order : (local.sort_order ?? 0),
+            local.sort_order ?? 0,
             remote.id
           );
         }

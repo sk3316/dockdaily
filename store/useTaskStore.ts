@@ -160,17 +160,34 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   reorderTasks: async (orderedIds) => {
+    // 1. Immediately update Zustand in-memory state so DraggableFlatList does not snap back
+    const current = get().tasks;
+    const map = new Map(current.map((t) => [t.id, t]));
+    const nextTasks = orderedIds
+      .map((id, index) => {
+        const item = map.get(id);
+        return item ? { ...item, sort_order: index } : null;
+      })
+      .filter((t): t is Task => t !== null);
+
+    const orderedSet = new Set(orderedIds);
+    const remaining = current.filter((t) => !orderedSet.has(t.id));
+    set({ tasks: [...nextTasks, ...remaining] });
+
+    // 2. Persist sort_order to SQLite in a single transaction
     const database = await getDatabase();
     const now = nowISO();
-    for (let i = 0; i < orderedIds.length; i++) {
-      await database.runAsync(
-        'UPDATE tasks SET sort_order = ?, updated_at = ?, synced = 0 WHERE id = ?',
-        i,
-        now,
-        orderedIds[i]
-      );
-    }
-    await get().loadTasks();
+    await database.withTransactionAsync(async () => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await database.runAsync(
+          'UPDATE tasks SET sort_order = ?, updated_at = ?, synced = 0 WHERE id = ?',
+          i,
+          now,
+          orderedIds[i]
+        );
+      }
+    });
+
     scheduleSync();
   },
 

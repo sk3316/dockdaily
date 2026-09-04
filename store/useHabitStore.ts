@@ -201,15 +201,32 @@ export const useHabitStore = create<HabitStore>((set, get) => ({
   },
 
   reorderHabits: async (orderedIds) => {
+    // 1. Immediately update Zustand in-memory state so DraggableFlatList does not snap back
+    const current = get().habits;
+    const map = new Map(current.map((h) => [h.id, h]));
+    const nextHabits = orderedIds
+      .map((id, index) => {
+        const item = map.get(id);
+        return item ? { ...item, sort_order: index } : null;
+      })
+      .filter((h): h is Habit => h !== null);
+
+    const orderedSet = new Set(orderedIds);
+    const remaining = current.filter((h) => !orderedSet.has(h.id));
+    set({ habits: [...nextHabits, ...remaining] });
+
+    // 2. Persist sort_order to SQLite in a single transaction
     const database = await getDatabase();
-    for (let i = 0; i < orderedIds.length; i++) {
-      await database.runAsync(
-        'UPDATE habits SET sort_order = ?, synced = 0 WHERE id = ?',
-        i,
-        orderedIds[i]
-      );
-    }
-    await get().loadHabits();
+    await database.withTransactionAsync(async () => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await database.runAsync(
+          'UPDATE habits SET sort_order = ?, synced = 0 WHERE id = ?',
+          i,
+          orderedIds[i]
+        );
+      }
+    });
+
     scheduleSync();
   },
 

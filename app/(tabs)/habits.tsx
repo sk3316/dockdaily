@@ -279,6 +279,7 @@ export default function HabitsScreen() {
             ) : (
               <TouchableOpacity
                 onPress={() => startEditingTitle(item)}
+                onLongPress={drag}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.habitTitle, { color: colors.text }]}>
