@@ -38,11 +38,19 @@ const INTERVAL_OPTIONS = [
   { label: "4 hrs", minutes: 240 },
 ];
 
-function parseReminderDate(currentDate?: string | null): Date {
+function parseReminderDate(currentDate?: string | null, isHabit = false): Date {
   if (currentDate) {
     const [y, m, d] = currentDate.split("-").map(Number);
     if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-      return new Date(y, m - 1, d, 0, 0, 0);
+      const parsed = new Date(y, m - 1, d, 0, 0, 0);
+      if (isHabit) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (parsed < today) {
+          return today;
+        }
+      }
+      return parsed;
     }
   }
   return new Date();
@@ -104,7 +112,7 @@ export default function ReminderDrawer({
   });
 
   const [selectedDate, setSelectedDate] = useState(() =>
-    parseReminderDate(currentDate ?? initialConfig?.startDate)
+    parseReminderDate(currentDate ?? initialConfig?.startDate, itemType === "habit")
   );
 
   // Single mode time
@@ -156,7 +164,9 @@ export default function ReminderDrawer({
       }
 
       setMode(itemType === "task" ? "single" : cfg?.mode ?? "single");
-      setSelectedDate(parseReminderDate(currentDate ?? cfg?.startDate));
+      setSelectedDate(
+        parseReminderDate(currentDate ?? cfg?.startDate, itemType === "habit")
+      );
       setSingleTime(parseTimeString(cfg?.time ?? currentTime, 9, 0));
 
       if (cfg?.times && cfg.times.length > 0) {

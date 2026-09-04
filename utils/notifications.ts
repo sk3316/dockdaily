@@ -1,6 +1,9 @@
 import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 import { getLocalDateString } from "@/utils/streak";
 import { HabitReminderConfig } from "@/types";
+
+export const NOTIFICATION_CHANNEL_ID = "dockdaily-reminders";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -14,7 +17,25 @@ Notifications.setNotificationHandler({
 
 const DAILY_REMINDER_ID = "dockdaily-daily-reminder";
 
+export async function setupNotificationChannels(): Promise<void> {
+  if (Platform.OS === "android") {
+    try {
+      await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, {
+        name: "DockDaily Reminders",
+        description: "Notifications for daily habits and task reminders",
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: "default",
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#6366f1",
+      });
+    } catch (err) {
+      console.warn("[Notifications] Failed to set notification channel:", err);
+    }
+  }
+}
+
 export async function requestNotificationPermissions(): Promise<boolean> {
+  await setupNotificationChannels();
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === "granted") return true;
   const { status } = await Notifications.requestPermissionsAsync();
@@ -38,6 +59,7 @@ export async function registerPushToken(): Promise<string | null> {
 export async function scheduleDailyReminder(
   reminderTime: string,
 ): Promise<void> {
+  await setupNotificationChannels();
   const [hour, minute] = reminderTime.split(":").map(Number);
   await Notifications.cancelScheduledNotificationAsync(DAILY_REMINDER_ID).catch(
     () => {},
@@ -53,6 +75,7 @@ export async function scheduleDailyReminder(
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
       hour,
       minute,
+      channelId: NOTIFICATION_CHANNEL_ID,
     },
   });
 }
@@ -221,8 +244,9 @@ export async function scheduleHabitReminder(
   habitId: string,
   title: string,
   reminderTimeOrTimes: string | string[],
-  reminderDate?: string | null // YYYY-MM-DD, optional start date
+  _reminderDate?: string | null // retained for interface compatibility
 ): Promise<void> {
+  await setupNotificationChannels();
   await cancelHabitReminder(habitId);
 
   const times = Array.isArray(reminderTimeOrTimes)
@@ -231,9 +255,6 @@ export async function scheduleHabitReminder(
 
   if (times.length === 0) return;
 
-  const todayKey = getLocalDateString();
-  const isFutureDate = reminderDate && reminderDate > todayKey;
-
   for (const timeStr of times) {
     const [hour, minute] = timeStr.split(":").map(Number);
     if (isNaN(hour) || isNaN(minute)) continue;
@@ -241,39 +262,23 @@ export async function scheduleHabitReminder(
     const timeTag = `${String(hour).padStart(2, "0")}${String(minute).padStart(2, "0")}`;
     const identifier = `${habitReminderPrefix(habitId)}-${timeTag}`;
 
-    if (isFutureDate) {
-      const [year, month, day] = reminderDate.split("-").map(Number);
-      const startDateTime = new Date(year, month - 1, day, hour, minute, 0);
-
-      if (startDateTime > new Date()) {
-        await Notifications.scheduleNotificationAsync({
-          identifier,
-          content: {
-            title: "✅ Habit reminder",
-            body: `Time for "${title}"`,
-            sound: true,
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: startDateTime,
-          },
-        }).catch(() => {});
-      }
-    } else {
-      await Notifications.scheduleNotificationAsync({
-        identifier,
-        content: {
-          title: "✅ Habit reminder",
-          body: `Time for "${title}"`,
-          sound: true,
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour,
-          minute,
-        },
-      }).catch(() => {});
-    }
+    // Habit reminders are always scheduled as recurring DAILY notifications
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        title: "✅ Habit reminder",
+        body: `Time for "${title}"`,
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour,
+        minute,
+        channelId: NOTIFICATION_CHANNEL_ID,
+      },
+    }).catch((err) => {
+      console.warn(`[Notifications] Failed to schedule habit reminder ${identifier}:`, err);
+    });
   }
 }
 
@@ -283,6 +288,7 @@ export async function scheduleTaskReminder(
   reminderTime: string,
   reminderDate?: string | null // YYYY-MM-DD
 ): Promise<void> {
+  await setupNotificationChannels();
   const [hour, minute] = reminderTime.split(":").map(Number);
   const identifier = taskReminderId(taskId);
 
@@ -320,7 +326,10 @@ export async function scheduleTaskReminder(
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date: target,
+      channelId: NOTIFICATION_CHANNEL_ID,
     },
+  }).catch((err) => {
+    console.warn(`[Notifications] Failed to schedule task reminder ${identifier}:`, err);
   });
 }
 
@@ -396,4 +405,56 @@ export async function fireRescueNotification(
     },
     trigger: null, // fires immediately
   });
+}
+
+/**
+ * Formats a habit's reminder configuration or time into a badge string.
+ * Used in both Habits screen and Today dashboard screen.
+ */
+export function getReminderBadgeText(habit: {
+  reminder_time?: string | null;
+  reminder_config?: string | null;
+}): string | null {
+  if (!habit.reminder_time && !habit.reminder_config) return null;
+  if (habit.reminder_config) {
+    try {
+      const cfg: HabitReminderConfig = JSON.parse(habit.reminder_config);
+      if (cfg.mode === "interval" && cfg.interval) {
+        const hrs = cfg.interval.stepMinutes / 60;
+        return `Every ${hrs % 1 === 0 ? hrs : hrs.toFixed(1)}h`;
+      }
+      if (cfg.mode === "times" && cfg.times && cfg.times.length > 0) {
+        const [h, m] = cfg.times[0].split(":").map(Number);
+        const ampm = h >= 12 ? "PM" : "AM";
+        const hour12 = h % 12 || 12;
+        if (cfg.times.length > 1) {
+          return `${hour12}:${String(m).padStart(2, "0")} ${ampm} (+${cfg.times.length - 1})`;
+        }
+        return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
+      }
+    } catch {}
+  }
+  if (habit.reminder_time) {
+    const [h, m] = habit.reminder_time.split(":").map(Number);
+    if (!isNaN(h) && !isNaN(m)) {
+      const ampm = h >= 12 ? "PM" : "AM";
+      const hour12 = h % 12 || 12;
+      return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Formats a task's reminder time into a badge string.
+ */
+export function getTaskReminderBadgeText(task: {
+  reminder_time?: string | null;
+}): string | null {
+  if (!task.reminder_time) return null;
+  const [h, m] = task.reminder_time.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return task.reminder_time;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
 }

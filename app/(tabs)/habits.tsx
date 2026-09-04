@@ -8,7 +8,7 @@ import { useAIStore } from "@/store/useAIStore";
 import { useHabitStore } from "@/store/useHabitStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { Habit, HabitReminderConfig } from "@/types";
-import { requestNotificationPermissions } from "@/utils/notifications";
+import { getReminderBadgeText, requestNotificationPermissions } from "@/utils/notifications";
 import { calculateStreak } from "@/utils/streak";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
@@ -37,32 +37,6 @@ const HABIT_TYPES: { key: Habit["type"]; label: string }[] = [
   { key: "count", label: "Count" },
   { key: "duration", label: "Minutes" },
 ];
-
-function getReminderBadgeText(habit: Habit): string | null {
-  if (!habit.reminder_time && !habit.reminder_config) return null;
-  if (habit.reminder_config) {
-    try {
-      const cfg: HabitReminderConfig = JSON.parse(habit.reminder_config);
-      if (cfg.mode === "interval" && cfg.interval) {
-        const hrs = cfg.interval.stepMinutes / 60;
-        return `Every ${hrs % 1 === 0 ? hrs : hrs.toFixed(1)}h`;
-      }
-      if (cfg.mode === "times" && cfg.times && cfg.times.length > 1) {
-        const [h, m] = cfg.times[0].split(":").map(Number);
-        const ampm = h >= 12 ? "PM" : "AM";
-        const hour12 = h % 12 || 12;
-        return `${hour12}:${String(m).padStart(2, "0")} ${ampm} (+${cfg.times.length - 1})`;
-      }
-    } catch {}
-  }
-  if (habit.reminder_time) {
-    const [h, m] = habit.reminder_time.split(":").map(Number);
-    const ampm = h >= 12 ? "PM" : "AM";
-    const hour12 = h % 12 || 12;
-    return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
-  }
-  return null;
-}
 
 export default function HabitsScreen() {
   const {
@@ -393,10 +367,16 @@ export default function HabitsScreen() {
             >
               <Ionicons
                 name={
-                  item.reminder_time ? "notifications" : "notifications-outline"
+                  item.reminder_time || item.reminder_config
+                    ? "notifications"
+                    : "notifications-outline"
                 }
                 size={18}
-                color={item.reminder_time ? colors.tint : colors.icon}
+                color={
+                  item.reminder_time || item.reminder_config
+                    ? colors.tint
+                    : colors.icon
+                }
               />
             </TouchableOpacity>
             <TouchableOpacity

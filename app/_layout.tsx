@@ -20,7 +20,13 @@ import { usePreferenceStore } from "@/store/usePreferenceStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useHabitStore } from "@/store/useHabitStore";
 import { useRescueStore } from "@/store/useRescueStore";
-import { handleSmartNotification, refreshHabitReminders, refreshTaskReminders, registerPushToken } from "@/utils/notifications";
+import {
+  handleSmartNotification,
+  refreshHabitReminders,
+  refreshTaskReminders,
+  registerPushToken,
+  setupNotificationChannels,
+} from "@/utils/notifications";
 import { supabase } from "@/lib/supabase";
 import * as Sentry from '@sentry/react-native';
 
@@ -60,6 +66,7 @@ export default Sentry.wrap(function RootLayout() {
     const init = async () => {
       try {
         await initDatabase();
+        await setupNotificationChannels();
         await usePreferenceStore.getState().loadPreferences();
         await useAuthStore.getState().loadSession();
         setDbReady(true);

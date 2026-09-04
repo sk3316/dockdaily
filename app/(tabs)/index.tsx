@@ -3,6 +3,7 @@ import { useCelebration } from "@/hooks/use-celebration";
 import { useHabitStore } from "@/store/useHabitStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { Habit, Task } from "@/types";
+import { getReminderBadgeText, getTaskReminderBadgeText } from "@/utils/notifications";
 import { calculateStreak } from "@/utils/streak";
 import { Ionicons } from "@expo/vector-icons";
 import { format, isToday } from "date-fns";
@@ -355,6 +356,14 @@ export default function TodayScreen() {
                       >
                         {streak} day{streak === 1 ? "" : "s"}
                       </Text>
+                      {getReminderBadgeText(habit) && (
+                        <View style={styles.reminderBadge}>
+                          <Ionicons name="notifications" size={10} color={colors.tint} />
+                          <Text style={[styles.reminderBadgeText, { color: colors.tint }]}>
+                            {getReminderBadgeText(habit)}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
 
@@ -453,14 +462,33 @@ export default function TodayScreen() {
                         />
                       </Animated.View>
                     </TouchableOpacity>
-                    <Text
-                      style={[
-                        styles.itemTitle,
-                        { color: colors.text, flex: 1 },
-                      ]}
-                    >
-                      {task.title}
-                    </Text>
+                    <View style={styles.itemInfo}>
+                      <Text
+                        style={[
+                          styles.itemTitle,
+                          { color: colors.text },
+                        ]}
+                      >
+                        {task.title}
+                      </Text>
+                      {(task.due_date || getTaskReminderBadgeText(task)) && (
+                        <View style={styles.streakRow}>
+                          {task.due_date && (
+                            <Text style={[styles.streakText, { color: colors.icon }]}>
+                              {task.due_date}
+                            </Text>
+                          )}
+                          {getTaskReminderBadgeText(task) && (
+                            <View style={styles.reminderBadge}>
+                              <Ionicons name="notifications" size={10} color={colors.tint} />
+                              <Text style={[styles.reminderBadgeText, { color: colors.tint }]}>
+                                {getTaskReminderBadgeText(task)}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
                   </View>
                 );
               })}
@@ -517,8 +545,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     marginTop: 3,
+    flexWrap: "wrap",
   },
   streakText: { fontSize: 12, fontWeight: "500" },
+  reminderBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    backgroundColor: "rgba(99, 102, 241, 0.12)",
+  },
+  reminderBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
   checkbox: { padding: 2 },
   counterRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   counterButton: {
