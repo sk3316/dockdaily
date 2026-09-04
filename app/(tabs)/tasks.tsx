@@ -118,9 +118,52 @@ export default function TasksScreen() {
     exitSelectMode();
   };
 
-  const handleBulkDelete = async () => {
-    await bulkDelete(Array.from(selectedIds));
-    exitSelectMode();
+  const confirmDeleteTask = (task: Task) => {
+    const title = "Delete Task";
+    const message = `Are you sure you want to delete "${task.title}"?`;
+
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+        deleteTask(task.id);
+      }
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => deleteTask(task.id),
+      },
+    ]);
+  };
+
+  const handleBulkDelete = () => {
+    const count = selectedIds.size;
+    if (count === 0) return;
+
+    const title = "Delete Tasks";
+    const message = `Are you sure you want to delete ${count} selected task${count === 1 ? "" : "s"}?`;
+
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+        bulkDelete(Array.from(selectedIds)).then(exitSelectMode);
+      }
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await bulkDelete(Array.from(selectedIds));
+          exitSelectMode();
+        },
+      },
+    ]);
   };
 
   const startEditing = (task: Task) => {
@@ -279,7 +322,7 @@ export default function TasksScreen() {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => deleteTask(item.id)}
+                onPress={() => confirmDeleteTask(item)}
                 style={{ padding: 4 }}
               >
                 <Ionicons name="trash-outline" size={20} color="#ef4444" />

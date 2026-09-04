@@ -131,6 +131,27 @@ export default function HabitsScreen() {
     }
   };
 
+  const confirmDeleteHabit = (habit: Habit) => {
+    const title = "Delete Habit";
+    const message = `Are you sure you want to delete "${habit.title}"? This will permanently remove the habit and its completion history.`;
+
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(`${title}\n\n${message}`)) {
+        deleteHabit(habit.id);
+      }
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => deleteHabit(habit.id),
+      },
+    ]);
+  };
+
   const handleIncrement = (habit: Habit, delta: number) => {
     const current = logsByHabit[habit.id]?.value ?? 0;
     const next = Math.max(0, current + delta);
@@ -380,7 +401,7 @@ export default function HabitsScreen() {
               />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => deleteHabit(item.id)}
+              onPress={() => confirmDeleteHabit(item)}
               style={{ padding: 4 }}
             >
               <Ionicons name="trash-outline" size={18} color="#ef4444" />
