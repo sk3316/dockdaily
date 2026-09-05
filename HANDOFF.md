@@ -6,7 +6,7 @@ handoff_created_at: "2026-08-31T18:18:00+05:30"
 project:
   name: "dockdaily"
   slug: "dockdaily"
-  version: "1.0.0"
+  version: "1.0.1"
   bundle_identifier: "com.sk3316.dockdaily"
   package_name: "com.sk3316.dockdaily"
   framework: "React Native 0.81.5 / Expo SDK 54.0.37"

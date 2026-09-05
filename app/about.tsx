@@ -1,3 +1,4 @@
+import { APP_VERSION, BUILD_NUMBER } from "@/constants/version";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -71,7 +72,7 @@ If you have questions or requests about your data, contact us at the email liste
     title: "ℹ️ About DockDaily",
     content: `DockDaily is a personal habit and task tracker built to help you stay consistent with the things that matter.
 
-Version: 1.0.0
+Version: ${APP_VERSION}${BUILD_NUMBER ? ` (${BUILD_NUMBER})` : ""}
 Built with: React Native, Expo, Supabase, Groq AI (OpenAI GPT-OSS)
 Developer: Shitanshu Priyadarshi
 Contact: contacttoshitu26@gmail.com

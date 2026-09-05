@@ -1,4 +1,5 @@
 import BugReportSheet from "@/components/BugReportSheet";
+import { FULL_VERSION_DISPLAY } from "@/constants/version";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useHabitStore } from "@/store/useHabitStore";
@@ -640,7 +641,7 @@ export default function ProfileScreen() {
 
         <TouchableOpacity onPress={() => router.push("/about" as any)}>
           <Text style={[styles.version, { color: colors.icon }]}>
-            DockDaily v1.0.0 · Privacy & About
+            DockDaily {FULL_VERSION_DISPLAY} · Privacy & About
           </Text>
         </TouchableOpacity>
       </ScrollView>
